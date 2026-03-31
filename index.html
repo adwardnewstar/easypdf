@@ -478,7 +478,7 @@
   <body>
     <!-- 登录弹窗 -->
     <div class="login-overlay" id="loginOverlay">
-      <div class="login-form">
+      <div class="login-form" autocomplete="off">
         <h2 class="login-title">EasyPDF</h2>
         <div class="login-input-group">
           <input
@@ -486,6 +486,7 @@
             class="login-input"
             id="loginEmail"
             placeholder="请输入账号"
+            autocomplete="off"
           />
         </div>
         <div class="login-input-group">
@@ -494,6 +495,7 @@
             class="login-input"
             id="loginPassword"
             placeholder="请输入密码"
+            autocomplete="off"
           />
         </div>
         <button class="login-button" id="loginButton">登录</button>
