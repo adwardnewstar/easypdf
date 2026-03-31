@@ -1,0 +1,1476 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>EasyPDF</title>
+    <link rel="icon" type="image/png" href="assets/icon/登入标签.png" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body,
+      html {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0a0c;
+        font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
+      }
+
+      .app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #0f0f12;
+        overflow: hidden;
+      }
+
+      /* 画布容器 */
+      .canvas-area {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #1a1a1a;
+        cursor: grab;
+        z-index: 1;
+      }
+      .canvas-area:active {
+        cursor: grabbing;
+      }
+      canvas {
+        display: block;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+        background: #fff;
+        touch-action: none;
+      }
+
+      /* 顶部磨砂工具栏 (透明度0.1) */
+      .top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(30, 30, 38, 0.1);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 200;
+        padding: 8px 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .toolbar-group {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .circle-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #c3c3c3;
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 20px;
+        color: white;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      }
+      .circle-btn:active {
+        transform: scale(0.94);
+      }
+
+      /* 图标样式 */
+      .btn-icon {
+        width: 24px;
+        height: 24px;
+        fill: #c2c2c2;
+      }
+      .fixed-btn-icon {
+        width: 32px;
+        height: 32px;
+        fill: #c2c2c2;
+      }
+      .pin-icon {
+        width: 32px;
+        height: 32px;
+        fill: white;
+      }
+
+      /* 上传反馈颜色 */
+      .circle-btn.upload-success {
+        background: #2e7d32 !important;
+      }
+      .circle-btn.upload-error {
+        background: #c62828 !important;
+      }
+
+      .scale-input {
+        background: rgba(20, 20, 28, 0.6);
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 22px;
+        padding: 0 12px;
+        height: 44px;
+        width: 66px;
+        color: white;
+        font-size: 15px;
+        font-weight: 500;
+        text-align: center;
+        outline: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        /* 取消上下箭头 */
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: textfield;
+      }
+      .scale-input::-webkit-outer-spin-button,
+      .scale-input::-webkit-inner-spin-button {
+        appearance: none;
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .scale-input:focus {
+        border-color: #ff9800;
+      }
+
+      /* 固定按钮 (左锁定，右缩略图) */
+      .fixed-btn {
+        position: fixed;
+        width: 66px;
+        height: 66px;
+        border-radius: 50%;
+        background: #c3c3c3;
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 180;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+        font-size: 28px;
+        color: white;
+        transition:
+          transform 0.05s,
+          opacity 0.2s;
+      }
+      .fixed-btn:active {
+        transform: scale(0.96);
+      }
+      .fixed-btn.locked {
+        opacity: 0.5;
+      }
+
+      /* 缩略图卡片 (可折叠) */
+      .thumb-card {
+        position: fixed;
+        background: rgba(20, 20, 28, 0.92);
+        backdrop-filter: blur(20px);
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+        transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        z-index: 170;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      }
+      .thumb-card.collapsed {
+        width: 66px !important;
+        height: 66px !important;
+        border-radius: 33px;
+        background: rgba(30, 30, 38, 0.8);
+        align-items: center;
+        justify-content: center;
+      }
+      .thumb-card.collapsed .thumb-inner,
+      .thumb-card.collapsed .viewport-marker {
+        display: none;
+      }
+      .thumb-card.collapsed .pin-toggle {
+        width: 100%;
+        height: 100%;
+        border-radius: 33px;
+        background: transparent;
+      }
+      .thumb-card:not(.collapsed) {
+        width: 12.5vw;
+        min-width: 52px;
+        max-width: 90px;
+        height: auto;
+        max-height: 45vh;
+        padding: 12px 8px;
+        border-radius: 24px;
+      }
+      .pin-toggle {
+        background: #c3c3c3;
+        border: none;
+        border-radius: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 20px;
+        color: white;
+        width: 44px;
+        height: 44px;
+      }
+      .thumb-card:not(.collapsed) .pin-toggle {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+        background: #c3c3c3;
+      }
+      .thumb-card:not(.collapsed) .pin-icon {
+        width: 32px;
+        height: 32px;
+      }
+      .thumb-inner {
+        position: relative;
+        width: 100%;
+        flex: 1;
+        background: #2c2c30;
+        border-radius: 16px;
+        overflow: hidden;
+        cursor: pointer;
+        min-height: 80px;
+        margin-top: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #thumbCanvas {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        background: white;
+        display: block;
+      }
+      .viewport-marker {
+        position: absolute;
+        border: 2px solid #ff9800;
+        background: rgba(255, 152, 0, 0.3);
+        pointer-events: none;
+        border-radius: 4px;
+      }
+
+      /* 历史下拉菜单 */
+      .history-menu {
+        position: fixed;
+        background: rgba(20, 20, 28, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 0;
+        z-index: 210;
+        min-width: 180px;
+        max-width: 240px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+        display: none;
+        flex-direction: column;
+      }
+      .history-menu.show {
+        display: flex;
+      }
+      .history-item {
+        padding: 10px 16px;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.1s;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .history-item:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      /* 锁定模式隐藏除锁定按钮外的所有控件 */
+      .locked-mode .top-bar,
+      .locked-mode .thumb-card,
+      .locked-mode .history-menu {
+        display: none !important;
+      }
+      .locked-mode {
+        cursor: default;
+      }
+
+      /* 加载蒙层 */
+      .loading-mask {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(12px);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 60px;
+        font-size: 15px;
+        font-weight: 500;
+        pointer-events: none;
+        z-index: 300;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .loading-icon {
+        width: 20px;
+        height: 20px;
+        fill: #c2c2c2;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .circle-btn {
+          width: 40px;
+          height: 40px;
+          font-size: 18px;
+        }
+        .scale-input {
+          width: 60px;
+          height: 40px;
+          font-size: 13px;
+          border-radius: 20px;
+        }
+        .fixed-btn {
+          width: 60px;
+          height: 60px;
+          font-size: 26px;
+        }
+      }
+      /* 登录界面 */
+      .login-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+      }
+      .login-form {
+        background: #c2c2c2;
+        backdrop-filter: blur(20px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 24px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      }
+      .login-title {
+        color: #333333;
+        font-size: 24px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .login-input-group {
+        margin-bottom: 16px;
+      }
+      .login-label {
+        display: block;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      .login-input {
+        width: 100%;
+        background: white;
+        border: 1px solid #999999;
+        border-radius: 6px;
+        padding: 10px 14px;
+        color: #333333;
+        font-size: 16px;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+      .login-input:focus {
+        border-color: #ff9800;
+        background: white;
+      }
+      .login-button {
+        width: 100%;
+        background: #ff9800;
+        border: none;
+        border-radius: 6px;
+        padding: 10px;
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 6px;
+      }
+      .login-button:hover {
+        background: #f57c00;
+        transform: translateY(-1px);
+      }
+      .login-button:active {
+        transform: translateY(0);
+      }
+      .login-error {
+        color: #f44336;
+        font-size: 14px;
+        text-align: center;
+        margin-top: 16px;
+        min-height: 20px;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // Supabase 配置
+      const SUPABASE_URL = "https://zwnluqynchoidpiittdp.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "sb_publishable_bmgWwgQxTGMf0r8tyqyTHg__3g7osn1";
+      const { createClient } = supabase;
+      const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    </script>
+  </head>
+  <body>
+    <!-- 登录弹窗 -->
+    <div class="login-overlay" id="loginOverlay">
+      <div class="login-form">
+        <h2 class="login-title">EasyPDF</h2>
+        <div class="login-input-group">
+          <input
+            type="email"
+            class="login-input"
+            id="loginEmail"
+            placeholder="请输入账号"
+          />
+        </div>
+        <div class="login-input-group">
+          <input
+            type="password"
+            class="login-input"
+            id="loginPassword"
+            placeholder="请输入密码"
+          />
+        </div>
+        <button class="login-button" id="loginButton">登录</button>
+        <div class="login-error" id="loginError"></div>
+      </div>
+    </div>
+
+    <div class="app" id="app">
+      <div class="canvas-area" id="canvasArea">
+        <canvas id="pdfCanvas"></canvas>
+      </div>
+
+      <!-- 顶部工具栏 -->
+      <div class="top-bar" id="topBar">
+        <div class="toolbar-group">
+          <button class="circle-btn" id="fileBtn" title="打开本地PDF">
+            <img src="assets/icon/打开.svg" alt="打开" class="btn-icon" />
+          </button>
+          <button class="circle-btn" id="zoomOutBtn" title="缩小">
+            <img src="assets/icon/缩小.svg" alt="缩小" class="btn-icon" />
+          </button>
+          <input type="text" id="scaleInput" class="scale-input" value="100" />
+          <button class="circle-btn" id="zoomInBtn" title="放大">
+            <img src="assets/icon/放大.svg" alt="放大" class="btn-icon" />
+          </button>
+          <button class="circle-btn" id="historyBtn" title="历史记录">
+            <img src="assets/icon/历史.svg" alt="历史" class="btn-icon" />
+          </button>
+          <button class="circle-btn" id="fullscreenBtn" title="全屏">
+            <img src="assets/icon/全屏画布.svg" alt="全屏" class="btn-icon" />
+          </button>
+          <button class="circle-btn" id="resetBtn" title="重置视图">
+            <img src="assets/icon/刷新.svg" alt="重置" class="btn-icon" />
+          </button>
+        </div>
+      </div>
+
+      <!-- 历史下拉菜单 -->
+      <div id="historyMenu" class="history-menu"></div>
+
+      <!-- 左侧锁定按钮（固定） -->
+      <div id="lockBtn" class="fixed-btn" style="left: 20px; bottom: 30px">
+        <img src="assets/icon/开锁.svg" alt="开锁" class="fixed-btn-icon" />
+      </div>
+
+      <!-- 右侧缩略图卡片（固定） -->
+      <div
+        id="thumbCard"
+        class="thumb-card collapsed"
+        style="right: 20px; bottom: 30px"
+      >
+        <button id="pinToggle" class="pin-toggle">
+          <img src="assets/icon/图钉.svg" alt="图钉" class="pin-icon" />
+        </button>
+        <div class="thumb-inner" id="thumbInner">
+          <canvas id="thumbCanvas"></canvas>
+          <div id="viewportMarker" class="viewport-marker"></div>
+        </div>
+      </div>
+
+      <div id="loadingMask" class="loading-mask" style="display: none">
+        <img src="assets/icon/刷新.svg" alt="加载中" class="loading-icon" />
+        <span>加载中...</span>
+      </div>
+      <input
+        type="file"
+        id="fileInput"
+        accept="application/pdf"
+        style="display: none"
+      />
+    </div>
+
+    <script>
+      // ==================== DOM 元素 ====================
+      const canvas = document.getElementById("pdfCanvas");
+      const canvasArea = document.getElementById("canvasArea");
+      const ctx = canvas.getContext("2d");
+      const fileInput = document.getElementById("fileInput");
+      const fileBtn = document.getElementById("fileBtn");
+      const scaleInput = document.getElementById("scaleInput");
+      const zoomOutBtn = document.getElementById("zoomOutBtn");
+      const zoomInBtn = document.getElementById("zoomInBtn");
+      const historyBtn = document.getElementById("historyBtn");
+      const fullscreenBtn = document.getElementById("fullscreenBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const lockBtnEl = document.getElementById("lockBtn");
+      const thumbCard = document.getElementById("thumbCard");
+      const pinToggle = document.getElementById("pinToggle");
+      const thumbInner = document.getElementById("thumbInner");
+      const thumbCanvas = document.getElementById("thumbCanvas");
+      const thumbCtx = thumbCanvas.getContext("2d");
+      const viewportMarker = document.getElementById("viewportMarker");
+      const app = document.getElementById("app");
+      const historyMenu = document.getElementById("historyMenu");
+      const loadingMask = document.getElementById("loadingMask");
+
+      // ==================== 全局状态 ====================
+      let pdfDoc = null; // PDF文档对象
+      let currentPage = null; // 当前页面
+      let scale = 1.0; // 缩放比例
+      let offsetX = 0,
+        offsetY = 0; // 偏移量（物理像素）
+      let offscreenCanvas = null; // 离屏渲染画布
+      let thumbWidth = 0,
+        thumbHeight = 0;
+      let dpr = window.devicePixelRatio || 1;
+
+      let locked = false; // 锁定模式
+      let collapsed = true; // 缩略图折叠状态
+
+      // 登录状态
+      let isLoggedIn = false;
+
+      // 当前文件信息
+      let currentFileName = null;
+      let currentArrayBuffer = null; // 内存缓存，用于重置
+      let currentStoragePath = null; // 当前文件在Supabase中的存储路径（若有）
+
+      // 交互状态
+      let isDragging = false;
+      let dragStartX = 0,
+        dragStartY = 0;
+      let startOffsetX = 0,
+        startOffsetY = 0;
+
+      // 双指缩放状态
+      let touchStartPoints = [];
+      let touchStartDistance = 0;
+      let touchStartCenter = { x: 0, y: 0 };
+      let touchStartScale = 1.0;
+      let touchStartOffsetX = 0,
+        touchStartOffsetY = 0;
+
+      let isRendering = false;
+
+      // ==================== 辅助函数 ====================
+      function showLoading(show, msg = "加载中...") {
+        if (show) {
+          loadingMask.textContent = msg;
+          loadingMask.style.display = "flex";
+        } else {
+          loadingMask.style.display = "none";
+        }
+      }
+
+      // 按钮颜色反馈（绿色/红色，3秒后恢复）
+      function setFileBtnFeedback(success) {
+        fileBtn.classList.add(success ? "upload-success" : "upload-error");
+        setTimeout(() => {
+          fileBtn.classList.remove("upload-success", "upload-error");
+        }, 3000);
+      }
+
+      // 登录相关函数
+      async function login(email, password) {
+        const loginError = document.getElementById("loginError");
+        loginError.textContent = "";
+
+        try {
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password,
+          });
+
+          if (error) {
+            loginError.textContent = "登录失败：" + error.message;
+            return false;
+          }
+
+          isLoggedIn = true;
+          document.getElementById("loginOverlay").style.display = "none";
+          return true;
+        } catch (err) {
+          loginError.textContent = "登录失败：" + err.message;
+          return false;
+        }
+      }
+
+      // 检查用户登录状态
+      async function checkAuthStatus() {
+        try {
+          const {
+            data: { user },
+          } = await supabaseClient.auth.getUser();
+          if (user) {
+            isLoggedIn = true;
+          }
+        } catch (err) {
+          console.error("检查登录状态失败", err);
+        }
+      }
+
+      // 更新缩放输入框
+      function updateScaleInput() {
+        scaleInput.value = (scale * 100).toFixed(1);
+      }
+
+      // 重新计算画布物理尺寸
+      function resizeCanvas() {
+        const rect = canvasArea.getBoundingClientRect();
+        let w = rect.width,
+          h = rect.height;
+        if (w < 10) w = window.innerWidth;
+        if (h < 10) h = window.innerHeight;
+        const physicalW = Math.round(w * dpr);
+        const physicalH = Math.round(h * dpr);
+        if (canvas.width !== physicalW || canvas.height !== physicalH) {
+          canvas.width = physicalW;
+          canvas.height = physicalH;
+          canvas.style.width = `${w}px`;
+          canvas.style.height = `${h}px`;
+          if (offscreenCanvas) {
+            drawCanvas();
+            updateThumbMarker();
+          }
+        }
+      }
+
+      // 将离屏画布绘制到主canvas
+      function drawCanvas() {
+        if (!offscreenCanvas || !ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(offscreenCanvas, offsetX, offsetY);
+      }
+
+      // 刷新完整渲染（重新渲染PDF到离屏画布）
+      async function refreshRender() {
+        if (!currentPage) return;
+        if (isRendering) {
+          await new Promise((r) => setTimeout(r, 50));
+          if (isRendering) return;
+        }
+        isRendering = true;
+        try {
+          const viewport = currentPage.getViewport({ scale: 1 });
+          const renderScale = scale * dpr;
+          const w = viewport.width * renderScale;
+          const h = viewport.height * renderScale;
+          if (!offscreenCanvas)
+            offscreenCanvas = document.createElement("canvas");
+          offscreenCanvas.width = w;
+          offscreenCanvas.height = h;
+          const offCtx = offscreenCanvas.getContext("2d");
+          const renderViewport = currentPage.getViewport({
+            scale: renderScale,
+          });
+          await currentPage.render({
+            canvasContext: offCtx,
+            viewport: renderViewport,
+            background: "white",
+          }).promise;
+          drawCanvas();
+          updateScaleInput();
+          updateThumbMarker();
+        } catch (err) {
+          console.error("渲染失败", err);
+        } finally {
+          isRendering = false;
+        }
+      }
+
+      // 仅更新平移（不重新渲染）
+      function updatePan() {
+        if (offscreenCanvas) drawCanvas();
+        updateThumbMarker();
+      }
+
+      // 重置视图为完整显示（不留边距）
+      async function resetView() {
+        if (!currentPage || !offscreenCanvas) return;
+        // 使用canvasArea的实际尺寸计算缩放比例
+        const rect = canvasArea.getBoundingClientRect();
+        let canvasW = rect.width;
+        let canvasH = rect.height;
+        if (canvasW < 10) canvasW = window.innerWidth;
+        if (canvasH < 10) canvasH = window.innerHeight;
+        // 转换为物理像素
+        canvasW = canvasW * dpr;
+        canvasH = canvasH * dpr;
+        // 使用PDF页面的实际尺寸计算缩放比例
+        const viewport = currentPage.getViewport({ scale: 1 });
+        const imgW = viewport.width * dpr;
+        const imgH = viewport.height * dpr;
+        let newScale = Math.min(canvasW / imgW, canvasH / imgH);
+        newScale = Math.min(8, newScale);
+        scale = newScale;
+        // 等待渲染完成
+        await refreshRender();
+        // 重新获取渲染后的尺寸并居中
+        const newW = offscreenCanvas.width;
+        const newH = offscreenCanvas.height;
+        offsetX = (canvas.width - newW) / 2;
+        offsetY = (canvas.height - newH) / 2;
+        // 确保画布更新
+        drawCanvas();
+        updateThumbMarker();
+        updateScaleInput();
+      }
+
+      // 中心缩放
+      async function scaleAtPoint(newScale, centerX, centerY) {
+        if (!currentPage || locked) return;
+        newScale = Math.min(8, newScale);
+        if (Math.abs(newScale - scale) < 0.001) return;
+        const oldScale = scale;
+        const newOffX = centerX - (centerX - offsetX) * (newScale / oldScale);
+        const newOffY = centerY - (centerY - offsetY) * (newScale / oldScale);
+        scale = newScale;
+        offsetX = newOffX;
+        offsetY = newOffY;
+        updateScaleInput();
+        await refreshRender();
+      }
+
+      // ==================== PDF 加载核心 ====================
+      async function loadPDFFromBuffer(buffer, fileName, storagePath = null) {
+        // 检查登录状态
+        if (!isLoggedIn) {
+          document.getElementById("loginOverlay").style.display = "flex";
+          return;
+        }
+        try {
+          showLoading(true, "渲染中...");
+          if (pdfDoc) pdfDoc.destroy?.();
+          currentPage = null;
+          offscreenCanvas = null;
+          const task = pdfjsLib.getDocument({
+            data: buffer,
+            useSystemFonts: true,
+          });
+          pdfDoc = await task.promise;
+          currentPage = await pdfDoc.getPage(1);
+          scale = 1.0;
+          offsetX = 0;
+          offsetY = 0;
+          // 创建离屏画布并初始化
+          const viewport = currentPage.getViewport({ scale: 1 });
+          const renderScale = scale * dpr;
+          const w = viewport.width * renderScale;
+          const h = viewport.height * renderScale;
+          offscreenCanvas = document.createElement("canvas");
+          offscreenCanvas.width = w;
+          offscreenCanvas.height = h;
+          // 直接调用 resetView，它会计算最佳缩放比例并渲染
+          await resetView();
+          if (!collapsed) generateThumbnail();
+          showLoading(false);
+          currentFileName = fileName;
+          // 安全地复制ArrayBuffer
+          if (buffer instanceof ArrayBuffer) {
+            try {
+              currentArrayBuffer = new ArrayBuffer(buffer.byteLength);
+              const srcArray = new Uint8Array(buffer);
+              const destArray = new Uint8Array(currentArrayBuffer);
+              destArray.set(srcArray);
+            } catch (err) {
+              console.warn("ArrayBuffer复制失败，使用原始buffer", err);
+              currentArrayBuffer = buffer;
+            }
+          }
+          currentStoragePath = storagePath;
+        } catch (err) {
+          console.error("加载PDF失败", err);
+          showLoading(false);
+          // 静默失败，不显示提示
+        }
+      }
+
+      // 从Supabase下载并加载（历史文件）
+      async function loadFromSupabase(storagePath, fileName) {
+        // 检查登录状态
+        if (!isLoggedIn) {
+          document.getElementById("loginOverlay").style.display = "flex";
+          return;
+        }
+        try {
+          showLoading(true, "加载历史文件...");
+          const { data, error } = await supabaseClient.storage
+            .from("PDFs")
+            .download(storagePath);
+          if (error) throw error;
+          const buffer = await data.arrayBuffer();
+          await loadPDFFromBuffer(buffer, fileName, storagePath);
+        } catch (err) {
+          console.error("历史文件加载失败", err);
+          showLoading(false);
+          // 静默失败，不弹窗
+        }
+      }
+
+      // 本地文件上传（后台异步，带按钮反馈）
+      async function uploadToSupabase(file, buffer) {
+        // 检查登录状态
+        if (!isLoggedIn) {
+          return;
+        }
+        try {
+          // 检查文件大小是否小于1MB
+          if (file.size > 1024 * 1024) {
+            console.warn("文件大小超过1MB，跳过上传");
+            return;
+          }
+
+          const ext = file.name.split(".").pop();
+          const storageName = `${Date.now()}_${Math.random().toString(36).substr(2)}.${ext}`;
+          const { error: uploadErr } = await supabaseClient.storage
+            .from("PDFs")
+            .upload(storageName, file);
+          if (uploadErr) throw uploadErr;
+
+          // 插入历史记录
+          const { error: insertErr } = await supabaseClient
+            .from("pdf_history")
+            .insert([
+              {
+                file_name: file.name,
+                storage_path: storageName,
+                size: file.size,
+              },
+            ]);
+          if (insertErr) throw insertErr;
+
+          // 检查并限制存储数量为5个
+          await limitStorageFiles();
+
+          setFileBtnFeedback(true);
+          // 更新当前文件的存储路径（如果加载的是同一个文件）
+          if (currentFileName === file.name) {
+            currentStoragePath = storageName;
+          }
+        } catch (err) {
+          console.error("上传失败", err);
+          setFileBtnFeedback(false);
+        }
+      }
+
+      // 限制存储文件数量为5个，删除最旧的文件
+      async function limitStorageFiles() {
+        try {
+          // 获取所有历史记录，按创建时间排序
+          const { data, error } = await supabaseClient
+            .from("pdf_history")
+            .select("file_name, storage_path, created_at")
+            .order("created_at", { ascending: true }); // 按时间升序，最旧的在前
+
+          if (error) throw error;
+
+          // 如果文件数量超过5个，删除最旧的
+          if (data && data.length > 5) {
+            const filesToDelete = data.slice(0, data.length - 5); // 保留最新的5个
+
+            for (const file of filesToDelete) {
+              // 从存储桶中删除文件
+              const { error: deleteErr } = await supabaseClient.storage
+                .from("PDFs")
+                .remove([file.storage_path]);
+
+              if (deleteErr) {
+                console.error(`删除文件失败: ${file.storage_path}`, deleteErr);
+                continue;
+              }
+
+              // 从历史表中删除记录
+              const { error: removeErr } = await supabaseClient
+                .from("pdf_history")
+                .delete()
+                .eq("storage_path", file.storage_path);
+
+              if (removeErr) {
+                console.error(
+                  `删除历史记录失败: ${file.storage_path}`,
+                  removeErr,
+                );
+              }
+            }
+          }
+        } catch (err) {
+          console.error("限制存储文件数量失败", err);
+        }
+      }
+
+      // 打开本地文件
+      async function openLocalFile(file) {
+        if (!file) return;
+
+        // 检查登录状态
+        if (!isLoggedIn) {
+          document.getElementById("loginOverlay").style.display = "flex";
+          return;
+        }
+
+        // 检查文件类型
+        const fileType = file.type;
+        const fileName = file.name;
+        const fileExtension = fileName.split(".").pop().toLowerCase();
+
+        // 验证是否为PDF文件
+        if (fileType !== "application/pdf" && fileExtension !== "pdf") {
+          console.warn("文件类型错误，只支持PDF文件");
+          setFileBtnFeedback(false);
+          return;
+        }
+
+        try {
+          const buffer = await file.arrayBuffer();
+          await loadPDFFromBuffer(buffer, file.name);
+          // 后台异步上传
+          uploadToSupabase(file, buffer);
+        } catch (err) {
+          console.error("打开本地文件失败", err);
+        }
+      }
+
+      // 重置当前文件
+      async function resetCurrentFile() {
+        if (!currentFileName) return;
+        if (currentArrayBuffer) {
+          await loadPDFFromBuffer(
+            currentArrayBuffer,
+            currentFileName,
+            currentStoragePath,
+          );
+          return;
+        }
+        // 尝试从Supabase重新下载
+        if (currentStoragePath) {
+          await loadFromSupabase(currentStoragePath, currentFileName);
+        } else {
+          // 如果没有存储路径，尝试从历史表中查找同名最新文件
+          const list = await fetchHistoryList();
+          const match = list.find((item) => item.file_name === currentFileName);
+          if (match) {
+            await loadFromSupabase(match.storage_path, currentFileName);
+          }
+        }
+      }
+
+      // ==================== 历史记录 ====================
+      async function fetchHistoryList() {
+        try {
+          const { data, error } = await supabaseClient
+            .from("pdf_history")
+            .select("file_name, storage_path")
+            .order("created_at", { ascending: false })
+            .limit(5);
+          if (error) throw error;
+          return data || [];
+        } catch (err) {
+          console.error("获取历史失败", err);
+          return [];
+        }
+      }
+
+      // 显示/隐藏历史菜单（点击切换）
+      let isMenuOpen = false;
+      async function toggleHistoryMenu() {
+        if (locked) return;
+        if (isMenuOpen) {
+          historyMenu.classList.remove("show");
+          isMenuOpen = false;
+          return;
+        }
+        const items = await fetchHistoryList();
+        historyMenu.innerHTML = "";
+        if (items.length === 0) {
+          const div = document.createElement("div");
+          div.className = "history-item";
+          div.textContent = "暂无历史文件";
+          historyMenu.appendChild(div);
+        } else {
+          items.forEach((item) => {
+            const div = document.createElement("div");
+            div.className = "history-item";
+            div.textContent = item.file_name || "未命名文件";
+            div.onclick = async (e) => {
+              e.stopPropagation();
+              historyMenu.classList.remove("show");
+              isMenuOpen = false;
+              await loadFromSupabase(item.storage_path, item.file_name);
+            };
+            historyMenu.appendChild(div);
+          });
+        }
+        const btnRect = historyBtn.getBoundingClientRect();
+        historyMenu.style.top = `${btnRect.bottom + 8}px`;
+        historyMenu.style.left = `${btnRect.left}px`;
+        historyMenu.classList.add("show");
+        isMenuOpen = true;
+        // 点击外部关闭
+        const closeHandler = (e) => {
+          if (!historyMenu.contains(e.target) && e.target !== historyBtn) {
+            historyMenu.classList.remove("show");
+            isMenuOpen = false;
+            document.removeEventListener("click", closeHandler);
+          }
+        };
+        setTimeout(() => document.addEventListener("click", closeHandler), 10);
+      }
+
+      // ==================== 缩略图 ====================
+      async function generateThumbnail() {
+        if (!currentPage || collapsed) return;
+        const container = thumbInner.getBoundingClientRect();
+        let targetH = (container.height || 120) - 8;
+        if (targetH < 30) targetH = 100;
+        const pageViewport = currentPage.getViewport({ scale: 1 });
+        let thumbScale = targetH / pageViewport.height;
+        if (thumbScale > 1) thumbScale = 1;
+        const viewport = currentPage.getViewport({ scale: thumbScale });
+        thumbWidth = viewport.width;
+        thumbHeight = viewport.height;
+        thumbCanvas.width = thumbWidth;
+        thumbCanvas.height = thumbHeight;
+        thumbCanvas.style.width = `${thumbWidth}px`;
+        thumbCanvas.style.height = `${thumbHeight}px`;
+        try {
+          await currentPage.render({
+            canvasContext: thumbCtx,
+            viewport,
+            background: "white",
+          }).promise;
+          updateThumbMarker();
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
+      function updateThumbMarker() {
+        if (!currentPage || !offscreenCanvas || thumbWidth === 0 || collapsed)
+          return;
+        const canvasW = canvas.width,
+          canvasH = canvas.height;
+        const imgW = offscreenCanvas.width,
+          imgH = offscreenCanvas.height;
+        let left = -offsetX,
+          top = -offsetY;
+        let right = left + canvasW,
+          bottom = top + canvasH;
+        const visLeft = Math.max(left, 0);
+        const visTop = Math.max(top, 0);
+        const visRight = Math.min(right, imgW);
+        const visBottom = Math.min(bottom, imgH);
+        if (visRight <= visLeft || visBottom <= visTop) {
+          viewportMarker.style.display = "none";
+          return;
+        }
+        // 使用缩略图画布的实际显示尺寸来计算标记位置
+        const thumbCanvasRect = thumbCanvas.getBoundingClientRect();
+        // 直接计算可见区域在缩略图中的比例位置
+        const markerLeft = (visLeft / imgW) * thumbCanvasRect.width;
+        const markerTop = (visTop / imgH) * thumbCanvasRect.height;
+        const markerW = ((visRight - visLeft) / imgW) * thumbCanvasRect.width;
+        const markerH = ((visBottom - visTop) / imgH) * thumbCanvasRect.height;
+        viewportMarker.style.left = `${markerLeft}px`;
+        viewportMarker.style.top = `${markerTop}px`;
+        viewportMarker.style.width = `${markerW}px`;
+        viewportMarker.style.height = `${markerH}px`;
+        viewportMarker.style.display = "block";
+      }
+
+      function onThumbClick(e) {
+        if (locked || collapsed) return;
+        if (!currentPage || !offscreenCanvas) return;
+        const rect = thumbInner.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        // 使用缩略图画布的实际显示尺寸来计算比例
+        const thumbCanvasRect = thumbCanvas.getBoundingClientRect();
+        const ratioX = clickX / thumbCanvasRect.width;
+        const ratioY = clickY / thumbCanvasRect.height;
+        const imgX = ratioX * offscreenCanvas.width;
+        const imgY = ratioY * offscreenCanvas.height;
+        offsetX = canvas.width / 2 - imgX;
+        offsetY = canvas.height / 2 - imgY;
+        updatePan();
+      }
+
+      // ==================== 锁定模式 ====================
+      let wasFullscreenBeforeLock = false;
+      function toggleLock() {
+        locked = !locked;
+        const lockIcon = lockBtnEl.querySelector("img");
+        lockIcon.src = locked ? "assets/icon/锁定.svg" : "assets/icon/开锁.svg";
+        lockIcon.alt = locked ? "锁定" : "开锁";
+        if (locked) {
+          wasFullscreenBeforeLock = !!document.fullscreenElement;
+          if (!wasFullscreenBeforeLock) toggleFullscreen();
+          app.classList.add("locked-mode");
+          lockBtnEl.classList.add("locked");
+        } else {
+          if (document.fullscreenElement && !wasFullscreenBeforeLock) {
+            toggleFullscreen();
+          } else if (!document.fullscreenElement && wasFullscreenBeforeLock) {
+            toggleFullscreen();
+          }
+          app.classList.remove("locked-mode");
+          lockBtnEl.classList.remove("locked");
+        }
+      }
+
+      // ==================== 全屏 ====================
+      let isFullscreen = false;
+      function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }
+      document.addEventListener("fullscreenchange", () => {
+        isFullscreen = !!document.fullscreenElement;
+        const fullscreenIcon = fullscreenBtn.querySelector("img");
+        fullscreenIcon.src = isFullscreen
+          ? "assets/icon/还原画布.svg"
+          : "assets/icon/全屏画布.svg";
+        fullscreenIcon.alt = isFullscreen ? "还原" : "全屏";
+      });
+
+      // ==================== 画布交互 ====================
+      function onMouseDown(e) {
+        if (!offscreenCanvas) return;
+        e.preventDefault();
+        isDragging = true;
+        dragStartX = e.clientX * dpr;
+        dragStartY = e.clientY * dpr;
+        startOffsetX = offsetX;
+        startOffsetY = offsetY;
+        canvasArea.style.cursor = "grabbing";
+      }
+      function onMouseMove(e) {
+        if (!isDragging || !offscreenCanvas) return;
+        e.preventDefault();
+        offsetX = startOffsetX + (e.clientX * dpr - dragStartX);
+        offsetY = startOffsetY + (e.clientY * dpr - dragStartY);
+        updatePan();
+      }
+      function onMouseUp() {
+        isDragging = false;
+        canvasArea.style.cursor = "grab";
+      }
+      function onWheel(e) {
+        if (!currentPage || locked) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const cx = (e.clientX - rect.left) * dpr;
+        const cy = (e.clientY - rect.top) * dpr;
+        const delta = e.deltaY > 0 ? 0.92 : 1.08;
+        scaleAtPoint(scale * delta, cx, cy);
+      }
+      function onTouchStart(e) {
+        e.preventDefault();
+        const touches = e.touches;
+        if (touches.length === 1) {
+          const t = touches[0];
+          dragStartX = t.clientX * dpr;
+          dragStartY = t.clientY * dpr;
+          startOffsetX = offsetX;
+          startOffsetY = offsetY;
+          isDragging = true;
+        } else if (touches.length === 2 && !locked) {
+          isDragging = false;
+          const p1 = {
+            x: touches[0].clientX * dpr,
+            y: touches[0].clientY * dpr,
+          };
+          const p2 = {
+            x: touches[1].clientX * dpr,
+            y: touches[1].clientY * dpr,
+          };
+          touchStartPoints = [p1, p2];
+          touchStartDistance = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          const rect = canvas.getBoundingClientRect();
+          const center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+          touchStartCenter = {
+            x: center.x - rect.left * dpr,
+            y: center.y - rect.top * dpr,
+          };
+          touchStartScale = scale;
+          touchStartOffsetX = offsetX;
+          touchStartOffsetY = offsetY;
+        }
+      }
+      function onTouchMove(e) {
+        e.preventDefault();
+        const touches = e.touches;
+        if (touches.length === 1 && isDragging) {
+          offsetX = startOffsetX + (touches[0].clientX * dpr - dragStartX);
+          offsetY = startOffsetY + (touches[0].clientY * dpr - dragStartY);
+          updatePan();
+        } else if (touches.length === 2 && touchStartPoints.length && !locked) {
+          const p1 = {
+            x: touches[0].clientX * dpr,
+            y: touches[0].clientY * dpr,
+          };
+          const p2 = {
+            x: touches[1].clientX * dpr,
+            y: touches[1].clientY * dpr,
+          };
+          const curDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          const curCenter = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+          const rect = canvas.getBoundingClientRect();
+          const cx = curCenter.x - rect.left * dpr;
+          const cy = curCenter.y - rect.top * dpr;
+          let newScale = touchStartScale * (curDist / touchStartDistance);
+          newScale = Math.min(8, Math.max(0.2, newScale));
+          const ratio = newScale / touchStartScale;
+          offsetX = cx - (touchStartCenter.x - touchStartOffsetX) * ratio;
+          offsetY = cy - (touchStartCenter.y - touchStartOffsetY) * ratio;
+          scale = newScale;
+          updateScaleInput();
+          refreshRender();
+          touchStartDistance = curDist;
+          touchStartScale = scale;
+          touchStartOffsetX = offsetX;
+          touchStartOffsetY = offsetY;
+          touchStartCenter = { x: cx, y: cy };
+        }
+      }
+      function onTouchEnd(e) {
+        if (e?.touches?.length === 0) {
+          isDragging = false;
+          touchStartPoints = [];
+        }
+      }
+
+      function onCanvasClick(e) {
+        if (pdfDoc && currentPage) return;
+        // 检查登录状态
+        if (!isLoggedIn) {
+          document.getElementById("loginOverlay").style.display = "flex";
+          return;
+        }
+        fileInput.click();
+      }
+
+      // ==================== 初始化 ====================
+      async function init() {
+        // 检查登录状态
+        await checkAuthStatus();
+
+        // 登录按钮事件监听
+        const loginButton = document.getElementById("loginButton");
+        const loginEmail = document.getElementById("loginEmail");
+        const loginPassword = document.getElementById("loginPassword");
+
+        if (loginButton) {
+          loginButton.addEventListener("click", () => {
+            const email = loginEmail.value.trim();
+            const password = loginPassword.value;
+            if (email && password) {
+              login(email, password);
+            } else {
+              document.getElementById("loginError").textContent =
+                "请输入账号和密码";
+            }
+          });
+
+          // 回车键登录
+          loginPassword.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+              const email = loginEmail.value.trim();
+              const password = loginPassword.value;
+              if (email && password) {
+                login(email, password);
+              } else {
+                document.getElementById("loginError").textContent =
+                  "请输入账号和密码";
+              }
+            }
+          });
+        }
+
+        // 监听尺寸变化
+        const resizeObserver = new ResizeObserver(() => {
+          resizeCanvas();
+          if (offscreenCanvas) {
+            drawCanvas();
+            updateThumbMarker();
+          }
+        });
+        resizeObserver.observe(canvasArea);
+        window.addEventListener("resize", () => {
+          resizeCanvas();
+          if (offscreenCanvas) {
+            drawCanvas();
+            updateThumbMarker();
+          }
+        });
+
+        // 绑定画布事件
+        canvas.addEventListener("mousedown", onMouseDown);
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        canvas.addEventListener("wheel", onWheel, { passive: false });
+        canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+        canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+        canvas.addEventListener("touchend", onTouchEnd);
+        canvas.addEventListener("click", onCanvasClick);
+
+        // 工具栏按钮
+        zoomInBtn.addEventListener("click", () => {
+          if (locked) return;
+          scaleAtPoint(scale * 1.2, canvas.width / 2, canvas.height / 2);
+        });
+        zoomOutBtn.addEventListener("click", () => {
+          if (locked) return;
+          scaleAtPoint(scale * 0.833, canvas.width / 2, canvas.height / 2);
+        });
+        scaleInput.addEventListener("change", () => {
+          if (locked) return;
+          let val = parseFloat(scaleInput.value);
+          if (isNaN(val)) val = 100;
+          val = Math.min(800, val);
+          scaleAtPoint(val / 100, canvas.width / 2, canvas.height / 2);
+        });
+        historyBtn.addEventListener("click", toggleHistoryMenu);
+        fullscreenBtn.addEventListener("click", () => {
+          if (locked) return;
+          toggleFullscreen();
+        });
+        resetBtn.addEventListener("click", async () => {
+          if (locked) return;
+          await resetView();
+        });
+        fileBtn.addEventListener("click", () => {
+          if (locked) return;
+          // 记录当前全屏状态，文件选择器关闭后恢复
+          const wasFullscreen = !!document.fullscreenElement;
+          fileInput.click();
+          // 如果在全屏状态，保持全屏
+          if (wasFullscreen && !document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          }
+        });
+        fileInput.addEventListener("change", (e) => {
+          if (locked) return;
+          if (e.target.files && e.target.files[0])
+            openLocalFile(e.target.files[0]);
+        });
+
+        // 锁定按钮
+        lockBtnEl.addEventListener("click", toggleLock);
+
+        // 缩略图
+        pinToggle.addEventListener("click", () => {
+          if (locked) return;
+          collapsed = !collapsed;
+          if (collapsed) {
+            thumbCard.classList.add("collapsed");
+          } else {
+            thumbCard.classList.remove("collapsed");
+            generateThumbnail();
+          }
+        });
+        thumbInner.addEventListener("click", onThumbClick);
+
+        // 初始显示
+        resizeCanvas();
+        ctx.fillStyle = "#f0f0f0";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#888";
+        ctx.font = `${16 * dpr}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(
+          "点击空白区域打开PDF",
+          canvas.width / 2,
+          canvas.height / 2,
+        );
+
+        // 尝试加载第一个历史文件（静默失败）
+        const history = await fetchHistoryList();
+        if (history.length > 0) {
+          await loadFromSupabase(history[0].storage_path, history[0].file_name);
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
