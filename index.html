@@ -1333,6 +1333,10 @@
 
       // ==================== 初始化 ====================
       async function init() {
+        // 每次页面加载时自动登出，强制用户重新登录
+        await supabaseClient.auth.signOut();
+        isLoggedIn = false;
+
         // 检查登录状态
         await checkAuthStatus();
 
