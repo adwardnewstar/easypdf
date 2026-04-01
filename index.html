@@ -122,36 +122,36 @@
 
       /* 图标样式 */
       .btn-icon {
-        width: 1.5vw;
-        height: 1.5vw;
+        width: 7.5vw;
+        height: 7.5vw;
         min-width: 24px;
         min-height: 24px;
-        max-width: 48px;
-        max-height: 48px;
+        max-width: 120px;
+        max-height: 120px;
         fill: #c2c2c2;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
       }
       .fixed-btn-icon {
-        width: 2vw;
-        height: 2vw;
+        width: 10vw;
+        height: 10vw;
         min-width: 32px;
         min-height: 32px;
-        max-width: 64px;
-        max-height: 64px;
+        max-width: 160px;
+        max-height: 160px;
         fill: #c2c2c2;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
       }
       .pin-icon {
-        width: 2vw;
-        height: 2vw;
+        width: 10vw;
+        height: 10vw;
         min-width: 32px;
         min-height: 32px;
-        max-width: 64px;
-        max-height: 64px;
+        max-width: 160px;
+        max-height: 160px;
         fill: white;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
@@ -198,8 +198,12 @@
       /* 固定按钮 (左锁定，右缩略图) */
       .fixed-btn {
         position: fixed;
-        width: 66px;
-        height: 66px;
+        width: 8vw;
+        height: 8vw;
+        min-width: 66px;
+        min-height: 66px;
+        max-width: 330px;
+        max-height: 330px;
         border-radius: 50%;
         background: #c3c3c3;
         backdrop-filter: blur(16px);
@@ -210,7 +214,7 @@
         cursor: pointer;
         z-index: 180;
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-        font-size: 28px;
+        font-size: clamp(28px, 4vw, 140px);
         color: white;
         transition:
           transform 0.05s,
@@ -577,7 +581,7 @@
       <div id="historyMenu" class="history-menu"></div>
 
       <!-- 左侧锁定按钮（固定） -->
-      <div id="lockBtn" class="fixed-btn" style="left: 20px; bottom: 30px">
+      <div id="lockBtn" class="fixed-btn" style="left: 25vw; bottom: 30px">
         <img src="assets/icon/开锁.svg" alt="开锁" class="fixed-btn-icon" />
       </div>
 
@@ -585,7 +589,7 @@
       <div
         id="thumbCard"
         class="thumb-card collapsed"
-        style="right: 20px; bottom: 30px"
+        style="right: 25vw; bottom: 30px"
       >
         <button id="pinToggle" class="pin-toggle">
           <img src="assets/icon/图钉.svg" alt="图钉" class="pin-icon" />
