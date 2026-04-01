@@ -826,7 +826,7 @@
       // 中心缩放
       async function scaleAtPoint(newScale, centerX, centerY) {
         if (!currentPage || locked) return;
-        newScale = Math.min(8, newScale);
+        newScale = Math.min(1000, newScale); // 解锁到1000倍放大
         if (Math.abs(newScale - scale) < 0.001) return;
         const oldScale = scale;
         const newOffX = centerX - (centerX - offsetX) * (newScale / oldScale);
