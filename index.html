@@ -198,8 +198,7 @@
         background: rgba(30, 30, 38, 0.9);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        height: 8px;
+        border-radius: 9999px;
         z-index: 1000;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
@@ -207,8 +206,10 @@
         position: absolute;
         top: 50%;
         transform: translate(-50%, -50%);
-        width: 16px;
-        height: 16px;
+        width: 100%;
+        height: 100%;
+        max-width: 50px;
+        max-height: 50px;
         background: #c3c3c3;
         border: 2px solid white;
         border-radius: 50%;
@@ -1652,6 +1653,11 @@
             controlBar.remove();
           }
 
+          // 手机震动反馈
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+
           // 创建控制条
           controlBar = document.createElement("div");
           controlBar.className = "scale-control-bar";
@@ -1661,17 +1667,24 @@
 
           document.body.appendChild(controlBar);
 
-          // 定位控制条
-          const rect = scaleInput.getBoundingClientRect();
-          controlBar.style.left = `${rect.left}px`;
-          controlBar.style.top = `${rect.bottom + 10}px`;
-          controlBar.style.width = `${rect.width}px`;
+          // 定位控制条在锁定按钮和导航按钮之间
+          const lockBtnRect = lockBtnEl.getBoundingClientRect();
+          const thumbCardRect = thumbCard.getBoundingClientRect();
 
-          // 获取当前缩放值的小数部分（0-10）
-          const currentScale = scale * 100;
-          const integerPart = Math.floor(currentScale);
-          const decimalPart = Math.round((currentScale - integerPart) * 10);
-          controlBarValue = decimalPart;
+          // 计算控制条位置和尺寸
+          const controlBarLeft = lockBtnRect.right + 20;
+          const controlBarRight = thumbCardRect.left - 20;
+          const controlBarWidth = controlBarRight - controlBarLeft;
+          const controlBarHeight = Math.max(33, lockBtnRect.height * 0.5); // 锁定按钮高度的1/2，最小33px
+
+          controlBar.style.left = `${controlBarLeft}px`;
+          controlBar.style.top = `${lockBtnRect.top + (lockBtnRect.height - controlBarHeight) / 2}px`;
+          controlBar.style.width = `${controlBarWidth}px`;
+          controlBar.style.height = `${controlBarHeight}px`;
+
+          // 控制条中心为当前比例，范围为当前比例-5到+5
+          // 初始位置为中心（50%）
+          controlBarValue = 0.5;
 
           // 更新控制条位置
           updateControlBarPosition();
@@ -1710,15 +1723,32 @@
             isDragging = false;
           });
 
-          // 点击控制条外部关闭
+          // 点击空白处关闭控制条
           setTimeout(() => {
-            document.addEventListener("click", closeControlBar);
+            document.addEventListener("click", closeControlBarOnBlank);
           }, 100);
+        }
+
+        function closeControlBarOnBlank(e) {
+          // 点击空白处（非控制条、非输入框、非锁定按钮、非导航按钮）关闭控制条
+          if (
+            controlBar &&
+            !controlBar.contains(e.target) &&
+            e.target !== scaleInput &&
+            e.target !== lockBtnEl &&
+            !lockBtnEl.contains(e.target) &&
+            e.target !== thumbCard &&
+            !thumbCard.contains(e.target)
+          ) {
+            controlBar.remove();
+            controlBar = null;
+            document.removeEventListener("click", closeControlBarOnBlank);
+          }
         }
 
         function updateControlBarPosition() {
           const handle = controlBar.querySelector(".control-bar-handle");
-          const position = (controlBarValue / 10) * 100;
+          const position = controlBarValue * 100;
           handle.style.left = `${position}%`;
         }
 
@@ -1726,15 +1756,16 @@
           const rect = controlBar.getBoundingClientRect();
           let position = (clientX - rect.left) / rect.width;
           position = Math.max(0, Math.min(1, position));
-          controlBarValue = Math.round(position * 10);
+          controlBarValue = position;
           updateControlBarPosition();
           updateScaleFromControlBar();
         }
 
         function updateScaleFromControlBar() {
           const currentScale = scale * 100;
-          const integerPart = Math.floor(currentScale);
-          const newScale = integerPart + controlBarValue / 10;
+          // 控制条中心为当前比例，范围为当前比例-5到+5
+          // 新比例 = 当前比例 + (controlBarValue - 0.5) * 10
+          const newScale = currentScale + (controlBarValue - 0.5) * 10;
           scaleInput.value = newScale.toFixed(1);
           // 触发 change 事件
           scaleInput.dispatchEvent(new Event("change"));
@@ -1802,7 +1833,7 @@
         const fontSize = Math.max(16, buttonHeight * 0.35); // 字体高度为按钮高度的35%，最小16px
         ctx.font = `${fontSize * dpr}px sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText("EsayPDF", canvas.width / 2, canvas.height / 2);
+        ctx.fillText("EasyPDF", canvas.width / 2, canvas.height / 2);
 
         // 尝试加载第一个历史文件（静默失败）
         const history = await fetchHistoryList();
