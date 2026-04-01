@@ -21,6 +21,8 @@
       html {
         width: 100%;
         height: 100%;
+        min-width: 400px;
+        min-height: 400px;
         overflow: hidden;
         background: #0a0a0c;
         font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
@@ -62,9 +64,7 @@
         z-index: 2;
         opacity: 0.8;
         transition: opacity 0.3s ease;
-      }
-      .canvas-area:hover .canvas-instruction {
-        opacity: 1;
+        display: none;
       }
       .canvas-area:active {
         cursor: grabbing;
@@ -103,7 +103,7 @@
       .circle-btn {
         width: 44px;
         height: 44px;
-        border-radius: 50%;
+        border-radius: 9999px;
         background: #c3c3c3;
         backdrop-filter: blur(4px);
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -122,36 +122,36 @@
 
       /* 图标样式 */
       .btn-icon {
-        width: 7.5vw;
-        height: 7.5vw;
+        width: 1.5vw;
+        height: 1.5vw;
         min-width: 24px;
         min-height: 24px;
-        max-width: 120px;
-        max-height: 120px;
+        max-width: 48px;
+        max-height: 48px;
         fill: #c2c2c2;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
       }
       .fixed-btn-icon {
-        width: 10vw;
-        height: 10vw;
+        width: 2vw;
+        height: 2vw;
         min-width: 32px;
         min-height: 32px;
-        max-width: 160px;
-        max-height: 160px;
+        max-width: 64px;
+        max-height: 64px;
         fill: #c2c2c2;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
       }
       .pin-icon {
-        width: 10vw;
-        height: 10vw;
+        width: 2vw;
+        height: 2vw;
         min-width: 32px;
         min-height: 32px;
-        max-width: 160px;
-        max-height: 160px;
+        max-width: 64px;
+        max-height: 64px;
         fill: white;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
@@ -170,12 +170,12 @@
         background: rgba(20, 20, 28, 0.6);
         backdrop-filter: blur(4px);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 22px;
+        border-radius: 9999px;
         padding: 0 12px;
         height: 44px;
         width: 66px;
         color: white;
-        font-size: 15px;
+        font-size: 14.67px;
         font-weight: 500;
         text-align: center;
         outline: none;
@@ -191,6 +191,34 @@
         -webkit-appearance: none;
         margin: 0;
       }
+
+      /* 缩放控制条 */
+      .scale-control-bar {
+        position: fixed;
+        background: rgba(30, 30, 38, 0.9);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        height: 8px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      .control-bar-handle {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        background: #c3c3c3;
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: grab;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      }
+      .control-bar-handle:active {
+        cursor: grabbing;
+        transform: translate(-50%, -50%) scale(1.1);
+      }
       .scale-input:focus {
         border-color: #ff9800;
       }
@@ -198,13 +226,9 @@
       /* 固定按钮 (左锁定，右缩略图) */
       .fixed-btn {
         position: fixed;
-        width: 8vw;
-        height: 8vw;
-        min-width: 66px;
-        min-height: 66px;
-        max-width: 330px;
-        max-height: 330px;
-        border-radius: 50%;
+        width: 66px;
+        height: 66px;
+        border-radius: 9999px;
         background: #c3c3c3;
         backdrop-filter: blur(16px);
         border: 1px solid rgba(255, 255, 255, 0.25);
@@ -214,7 +238,7 @@
         cursor: pointer;
         z-index: 180;
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-        font-size: clamp(28px, 4vw, 140px);
+        font-size: 28px;
         color: white;
         transition:
           transform 0.05s,
@@ -244,7 +268,7 @@
       .thumb-card.collapsed {
         width: 66px !important;
         height: 66px !important;
-        border-radius: 33px;
+        border-radius: 9999px;
         background: rgba(30, 30, 38, 0.8);
         align-items: center;
         justify-content: center;
@@ -256,7 +280,7 @@
       .thumb-card.collapsed .pin-toggle {
         width: 100%;
         height: 100%;
-        border-radius: 33px;
+        border-radius: 9999px;
         background: transparent;
       }
       .thumb-card:not(.collapsed) {
@@ -400,6 +424,70 @@
         }
       }
 
+      /* 电脑端响应式样式 */
+      @media (min-width: 641px) {
+        /* 工具栏按钮：屏幕高度1/8 */
+        .circle-btn {
+          width: 12.5vh;
+          height: 12.5vh;
+          min-width: 44px;
+          min-height: 44px;
+        }
+        /* 输入框：高度屏幕高度1/8，宽高比1:1.5 */
+        .scale-input {
+          height: 12.5vh;
+          width: 18.75vh;
+          min-width: 66px;
+          min-height: 44px;
+          font-size: 4.17vh;
+          border-radius: 9999px;
+          /* 最小字体大小 */
+          font-size: max(4.17vh, 12px);
+        }
+        /* 锁定和导航按钮：屏幕高度1/7 */
+        .fixed-btn {
+          width: 14.28vh;
+          height: 14.28vh;
+          min-width: 66px;
+          min-height: 66px;
+        }
+        .thumb-card.collapsed {
+          width: 14.28vh !important;
+          height: 14.28vh !important;
+          min-width: 66px;
+          min-height: 66px;
+        }
+        .thumb-card.collapsed .pin-toggle {
+          width: 100%;
+          height: 100%;
+        }
+        /* 图标响应式大小 */
+        .btn-icon {
+          width: 6vh;
+          height: 6vh;
+          min-width: 20px;
+          min-height: 20px;
+        }
+        .fixed-btn-icon {
+          width: 7vh;
+          height: 7vh;
+          min-width: 28px;
+          min-height: 28px;
+        }
+        .pin-icon {
+          width: 7vh;
+          height: 7vh;
+          min-width: 28px;
+          min-height: 28px;
+        }
+        /* 提示文字响应式 */
+        .canvas-instruction {
+          padding: 1vh 2vh;
+          font-size: 2vh;
+          border-radius: 4vh;
+        }
+      }
+
       @media (max-width: 640px) {
         .circle-btn {
           width: 40px;
@@ -409,8 +497,8 @@
         .scale-input {
           width: 60px;
           height: 40px;
-          font-size: 13px;
-          border-radius: 20px;
+          font-size: 13.3px;
+          border-radius: 9999px;
         }
         .fixed-btn {
           width: 60px;
@@ -581,16 +669,12 @@
       <div id="historyMenu" class="history-menu"></div>
 
       <!-- 左侧锁定按钮（固定） -->
-      <div id="lockBtn" class="fixed-btn" style="left: 25vw; bottom: 30px">
+      <div id="lockBtn" class="fixed-btn" style="bottom: 30px">
         <img src="assets/icon/开锁.svg" alt="开锁" class="fixed-btn-icon" />
       </div>
 
       <!-- 右侧缩略图卡片（固定） -->
-      <div
-        id="thumbCard"
-        class="thumb-card collapsed"
-        style="right: 25vw; bottom: 30px"
-      >
+      <div id="thumbCard" class="thumb-card collapsed" style="bottom: 30px">
         <button id="pinToggle" class="pin-toggle">
           <img src="assets/icon/图钉.svg" alt="图钉" class="pin-icon" />
         </button>
@@ -616,6 +700,7 @@
       // ==================== DOM 元素 ====================
       const canvas = document.getElementById("pdfCanvas");
       const canvasArea = document.getElementById("canvasArea");
+      const canvasInstruction = document.querySelector(".canvas-instruction");
       const ctx = canvas.getContext("2d");
       const fileInput = document.getElementById("fileInput");
       const fileBtn = document.getElementById("fileBtn");
@@ -1219,17 +1304,43 @@
 
       // ==================== 锁定模式 ====================
       let wasFullscreenBeforeLock = false;
+      let instructionTimeout;
       function toggleLock() {
         locked = !locked;
         const lockIcon = lockBtnEl.querySelector("img");
         lockIcon.src = locked ? "assets/icon/锁定.svg" : "assets/icon/开锁.svg";
         lockIcon.alt = locked ? "锁定" : "开锁";
+
+        // 控制提示显示
         if (locked) {
+          // 锁定状态：显示提示，5秒后淡出
+          if (canvasInstruction) {
+            canvasInstruction.style.display = "block";
+            canvasInstruction.style.opacity = "1";
+            // 清除之前的定时器
+            if (instructionTimeout) {
+              clearTimeout(instructionTimeout);
+            }
+            // 5秒后淡出
+            instructionTimeout = setTimeout(() => {
+              canvasInstruction.style.opacity = "0";
+              setTimeout(() => {
+                canvasInstruction.style.display = "none";
+              }, 300);
+            }, 5000);
+          }
           wasFullscreenBeforeLock = !!document.fullscreenElement;
           if (!wasFullscreenBeforeLock) toggleFullscreen();
           app.classList.add("locked-mode");
           lockBtnEl.classList.add("locked");
         } else {
+          // 解锁状态：隐藏提示
+          if (canvasInstruction) {
+            canvasInstruction.style.display = "none";
+          }
+          if (instructionTimeout) {
+            clearTimeout(instructionTimeout);
+          }
           if (document.fullscreenElement && !wasFullscreenBeforeLock) {
             toggleFullscreen();
           } else if (!document.fullscreenElement && wasFullscreenBeforeLock) {
@@ -1376,6 +1487,24 @@
       }
 
       // ==================== 初始化 ====================
+      // 更新按钮位置（电脑端响应式）
+      function updateButtonPositions() {
+        const isMobile = window.innerWidth <= 640;
+        if (!isMobile) {
+          // 电脑端：锁定按钮中心距离左边缘1/4屏幕宽度，导航按钮中心距离右边缘1/4屏幕宽度
+          const lockBtnSize = lockBtnEl.offsetWidth || 66;
+          const thumbCardSize = thumbCard.offsetWidth || 66;
+          const leftPosition = window.innerWidth / 4 - lockBtnSize / 2;
+          const rightPosition = window.innerWidth / 4 - thumbCardSize / 2;
+          lockBtnEl.style.left = `${Math.max(20, leftPosition)}px`;
+          thumbCard.style.right = `${Math.max(20, rightPosition)}px`;
+        } else {
+          // 移动端：保持原有的靠左靠右位置
+          lockBtnEl.style.left = "20px";
+          thumbCard.style.right = "20px";
+        }
+      }
+
       async function init() {
         // 每次页面加载时自动登出，强制用户重新登录
         await supabaseClient.auth.signOut();
@@ -1383,6 +1512,9 @@
 
         // 检查登录状态
         await checkAuthStatus();
+
+        // 初始化按钮位置
+        updateButtonPositions();
 
         // 登录按钮事件监听
         const loginButton = document.getElementById("loginButton");
@@ -1427,6 +1559,7 @@
         resizeObserver.observe(canvasArea);
         window.addEventListener("resize", () => {
           resizeCanvas();
+          updateButtonPositions();
           if (offscreenCanvas) {
             drawCanvas();
             updateThumbMarker();
@@ -1441,6 +1574,7 @@
         canvas.addEventListener("touchstart", onTouchStart, { passive: false });
         canvas.addEventListener("touchmove", onTouchMove, { passive: false });
         canvas.addEventListener("touchend", onTouchEnd);
+
         // 双击锁定/解锁
         canvas.addEventListener("dblclick", () => {
           toggleLock();
@@ -1479,6 +1613,144 @@
           val = Math.min(800, val);
           scaleAtPoint(val / 100, canvas.width / 2, canvas.height / 2);
         });
+
+        // 长按输入框，显示控制条
+        let longPressTimer;
+        let controlBar;
+        let controlBarValue = 0;
+
+        scaleInput.addEventListener("touchstart", (e) => {
+          e.preventDefault(); // 阻止默认行为，不呼出键盘
+          startLongPress();
+        });
+
+        scaleInput.addEventListener("mousedown", (e) => {
+          e.preventDefault(); // 阻止默认行为，不呼出键盘
+          startLongPress();
+        });
+
+        function startLongPress() {
+          longPressTimer = setTimeout(() => {
+            showControlBar();
+          }, 500); // 500ms 长按触发
+        }
+
+        function cancelLongPress() {
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+          }
+        }
+
+        scaleInput.addEventListener("touchend", cancelLongPress);
+        scaleInput.addEventListener("touchcancel", cancelLongPress);
+        scaleInput.addEventListener("mouseup", cancelLongPress);
+        scaleInput.addEventListener("mouseleave", cancelLongPress);
+
+        function showControlBar() {
+          // 移除已存在的控制条
+          if (controlBar) {
+            controlBar.remove();
+          }
+
+          // 创建控制条
+          controlBar = document.createElement("div");
+          controlBar.className = "scale-control-bar";
+          controlBar.innerHTML = `
+            <div class="control-bar-handle" style="left: 50%;"></div>
+          `;
+
+          document.body.appendChild(controlBar);
+
+          // 定位控制条
+          const rect = scaleInput.getBoundingClientRect();
+          controlBar.style.left = `${rect.left}px`;
+          controlBar.style.top = `${rect.bottom + 10}px`;
+          controlBar.style.width = `${rect.width}px`;
+
+          // 获取当前缩放值的小数部分（0-10）
+          const currentScale = scale * 100;
+          const integerPart = Math.floor(currentScale);
+          const decimalPart = Math.round((currentScale - integerPart) * 10);
+          controlBarValue = decimalPart;
+
+          // 更新控制条位置
+          updateControlBarPosition();
+
+          // 绑定控制条事件
+          const handle = controlBar.querySelector(".control-bar-handle");
+          let isDragging = false;
+
+          handle.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            isDragging = true;
+          });
+
+          handle.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            isDragging = true;
+          });
+
+          document.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+              updateControlBarValue(e.clientX);
+            }
+          });
+
+          document.addEventListener("touchmove", (e) => {
+            if (isDragging) {
+              updateControlBarValue(e.touches[0].clientX);
+            }
+          });
+
+          document.addEventListener("mouseup", () => {
+            isDragging = false;
+          });
+
+          document.addEventListener("touchend", () => {
+            isDragging = false;
+          });
+
+          // 点击控制条外部关闭
+          setTimeout(() => {
+            document.addEventListener("click", closeControlBar);
+          }, 100);
+        }
+
+        function updateControlBarPosition() {
+          const handle = controlBar.querySelector(".control-bar-handle");
+          const position = (controlBarValue / 10) * 100;
+          handle.style.left = `${position}%`;
+        }
+
+        function updateControlBarValue(clientX) {
+          const rect = controlBar.getBoundingClientRect();
+          let position = (clientX - rect.left) / rect.width;
+          position = Math.max(0, Math.min(1, position));
+          controlBarValue = Math.round(position * 10);
+          updateControlBarPosition();
+          updateScaleFromControlBar();
+        }
+
+        function updateScaleFromControlBar() {
+          const currentScale = scale * 100;
+          const integerPart = Math.floor(currentScale);
+          const newScale = integerPart + controlBarValue / 10;
+          scaleInput.value = newScale.toFixed(1);
+          // 触发 change 事件
+          scaleInput.dispatchEvent(new Event("change"));
+        }
+
+        function closeControlBar(e) {
+          if (
+            controlBar &&
+            !controlBar.contains(e.target) &&
+            e.target !== scaleInput
+          ) {
+            controlBar.remove();
+            controlBar = null;
+            document.removeEventListener("click", closeControlBar);
+          }
+        }
         historyBtn.addEventListener("click", toggleHistoryMenu);
         fullscreenBtn.addEventListener("click", () => {
           if (locked) return;
@@ -1525,13 +1797,12 @@
         ctx.fillStyle = "#f0f0f0";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#888";
-        ctx.font = `${16 * dpr}px sans-serif`;
+        // 字体高度与按钮高度一致，设置最小字高
+        const buttonHeight = Math.max(44, window.innerHeight * 0.125); // 按钮高度（最小44px）
+        const fontSize = Math.max(16, buttonHeight * 0.35); // 字体高度为按钮高度的35%，最小16px
+        ctx.font = `${fontSize * dpr}px sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText(
-          "点击空白区域打开PDF",
-          canvas.width / 2,
-          canvas.height / 2,
-        );
+        ctx.fillText("EsayPDF", canvas.width / 2, canvas.height / 2);
 
         // 尝试加载第一个历史文件（静默失败）
         const history = await fetchHistoryList();
