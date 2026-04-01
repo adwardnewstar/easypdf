@@ -48,6 +48,24 @@
         cursor: grab;
         z-index: 1;
       }
+      .canvas-instruction {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        pointer-events: none;
+        z-index: 2;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+      }
+      .canvas-area:hover .canvas-instruction {
+        opacity: 1;
+      }
       .canvas-area:active {
         cursor: grabbing;
       }
@@ -505,6 +523,7 @@
 
     <div class="app" id="app">
       <div class="canvas-area" id="canvasArea">
+        <div class="canvas-instruction">双击锁定/解锁画布</div>
         <canvas id="pdfCanvas"></canvas>
       </div>
 
@@ -1397,7 +1416,27 @@
         canvas.addEventListener("touchstart", onTouchStart, { passive: false });
         canvas.addEventListener("touchmove", onTouchMove, { passive: false });
         canvas.addEventListener("touchend", onTouchEnd);
-        canvas.addEventListener("click", onCanvasClick);
+        // 双击锁定/解锁
+        canvas.addEventListener("dblclick", () => {
+          toggleLock();
+        });
+
+        // 触屏双击检测
+        let lastTouchTime = 0;
+        const DOUBLE_TAP_DELAY = 300; // 双击延迟阈值（毫秒）
+        canvas.addEventListener("touchstart", (e) => {
+          const currentTime = new Date().getTime();
+          const tapLength = e.touches.length;
+
+          if (tapLength === 1) {
+            if (currentTime - lastTouchTime < DOUBLE_TAP_DELAY) {
+              // 检测到双击
+              toggleLock();
+              e.preventDefault();
+            }
+            lastTouchTime = currentTime;
+          }
+        });
 
         // 工具栏按钮
         zoomInBtn.addEventListener("click", () => {
