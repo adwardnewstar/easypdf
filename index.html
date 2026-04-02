@@ -389,8 +389,8 @@
         border: 1px solid rgba(255, 255, 255, 0.2);
         padding: 0;
         z-index: 210;
-        min-width: 180px;
-        max-width: 50vw;
+        min-width: 50vw;
+        max-width: 80vw;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
         display: none;
         flex-direction: column;
@@ -436,8 +436,8 @@
           border-radius: 10px;
           box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
           padding: 0;
-          min-width: 200px;
-          max-width: 50vw;
+          min-width: 50vw;
+          max-width: 80vw;
           flex-direction: column;
           gap: 0;
           max-height: none;
@@ -890,6 +890,31 @@
         }
       }
 
+      // 从Supabase加载最佳比例
+      async function loadBestScaleFromSupabase() {
+        if (!isLoggedIn) return;
+
+        const {
+          data: { user },
+        } = await supabaseClient.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabaseClient
+          .from("user_settings")
+          .select("best_scale")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error) {
+          console.error("加载最佳比例失败:", error);
+          return;
+        }
+
+        if (data && data.best_scale) {
+          localStorage.setItem("easyPdfBestScale", data.best_scale);
+        }
+      }
+
       // 检查用户登录状态
       async function checkAuthStatus() {
         try {
@@ -1271,41 +1296,65 @@
 
       // 显示/隐藏历史菜单（点击切换）
       let isMenuOpen = false;
-      async function toggleHistoryMenu() {
+      function toggleHistoryMenu() {
         if (locked) return;
         if (isMenuOpen) {
           historyMenu.classList.remove("show");
           isMenuOpen = false;
           return;
         }
-        const items = await fetchHistoryList();
-        historyMenu.innerHTML = "";
-        if (items.length === 0) {
-          const div = document.createElement("div");
-          div.className = "history-item";
-          div.textContent = "暂无历史文件";
-          historyMenu.appendChild(div);
-        } else {
-          items.forEach((item) => {
-            const div = document.createElement("div");
-            div.className = "history-item";
-            div.textContent = item.file_name || "未命名文件";
-            div.ondblclick = async (e) => {
-              e.stopPropagation();
-              historyMenu.classList.remove("show");
-              isMenuOpen = false;
-              await loadFromSupabase(item.storage_path, item.file_name);
-            };
-            historyMenu.appendChild(div);
-          });
-        }
+
+        // 先显示菜单，然后在后台获取历史文件列表
         const btnRect = historyBtn.getBoundingClientRect();
         const topBarRect = topBar.getBoundingClientRect();
         // 所有设备：在功能栏下面展开
-        historyMenu.style.top = `${topBarRect.bottom + 8}px`;
+        historyMenu.style.top = `${topBarRect.bottom + 2}vh`;
         historyMenu.style.left = `${btnRect.left}px`;
+
+        // 显示加载状态
+        historyMenu.innerHTML = "";
+        const loadingDiv = document.createElement("div");
+        loadingDiv.className = "history-item";
+        loadingDiv.textContent = "加载中...";
+        historyMenu.appendChild(loadingDiv);
+
+        // 显示菜单
         historyMenu.classList.add("show");
         isMenuOpen = true;
+
+        // 后台获取历史文件列表
+        fetchHistoryList()
+          .then((items) => {
+            historyMenu.innerHTML = "";
+            if (items.length === 0) {
+              const div = document.createElement("div");
+              div.className = "history-item";
+              div.textContent = "暂无历史文件";
+              historyMenu.appendChild(div);
+            } else {
+              items.forEach((item) => {
+                const div = document.createElement("div");
+                div.className = "history-item";
+                div.textContent = item.file_name || "未命名文件";
+                div.ondblclick = async (e) => {
+                  e.stopPropagation();
+                  historyMenu.classList.remove("show");
+                  isMenuOpen = false;
+                  await loadFromSupabase(item.storage_path, item.file_name);
+                };
+                historyMenu.appendChild(div);
+              });
+            }
+          })
+          .catch((err) => {
+            console.error("获取历史失败", err);
+            historyMenu.innerHTML = "";
+            const errorDiv = document.createElement("div");
+            errorDiv.className = "history-item";
+            errorDiv.textContent = "加载失败";
+            historyMenu.appendChild(errorDiv);
+          });
+
         // 点击外部关闭
         const closeHandler = (e) => {
           if (!historyMenu.contains(e.target) && e.target !== historyBtn) {
@@ -1604,6 +1653,23 @@
 
         // 初始化按钮位置
         updateButtonPositions();
+
+        // 检查 Session Storage 中是否有临时存储的渲染状态
+        const tempState = sessionStorage.getItem("easyPdfTempState");
+        if (tempState) {
+          try {
+            const {
+              scale: savedScale,
+              offsetX: savedOffsetX,
+              offsetY: savedOffsetY,
+            } = JSON.parse(tempState);
+            scale = savedScale;
+            offsetX = savedOffsetX;
+            offsetY = savedOffsetY;
+          } catch (e) {
+            console.error("解析临时状态失败:", e);
+          }
+        }
 
         // 登录按钮事件监听
         const loginButton = document.getElementById("loginButton");
@@ -2154,6 +2220,16 @@
         if (history.length > 0) {
           await loadFromSupabase(history[0].storage_path, history[0].file_name);
         }
+
+        // 页面刷新前保存状态到 Session Storage
+        window.addEventListener("beforeunload", () => {
+          const tempState = {
+            scale: scale,
+            offsetX: offsetX,
+            offsetY: offsetY,
+          };
+          sessionStorage.setItem("easyPdfTempState", JSON.stringify(tempState));
+        });
       }
 
       init();
