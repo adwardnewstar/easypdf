@@ -101,8 +101,10 @@
       }
 
       .circle-btn {
-        width: 44px;
-        height: 44px;
+        width: 12.5vh;
+        height: 12.5vh;
+        min-width: 44px;
+        min-height: 44px;
         border-radius: 9999px;
         background: #c3c3c3;
         backdrop-filter: blur(4px);
@@ -167,11 +169,13 @@
         backdrop-filter: blur(4px);
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 9999px;
-        padding: 0 12px;
-        height: 44px;
-        width: 66px;
+        padding: 0 3vh;
+        height: 12.5vh;
+        min-height: 44px;
+        width: 18.75vh;
+        min-width: 66px;
         color: white;
-        font-size: 14.67px;
+        font-size: 4.17vh;
         font-weight: 500;
         text-align: center;
         outline: none;
@@ -386,7 +390,7 @@
         padding: 0;
         z-index: 210;
         min-width: 180px;
-        max-width: 240px;
+        max-width: 50vw;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
         display: none;
         flex-direction: column;
@@ -398,11 +402,12 @@
         display: flex;
       }
       .history-item {
-        padding: 0 12px;
+        padding: 0 3vh;
         color: black;
-        font-size: 19.07px;
+        font-size: 4.17vh;
         font-weight: 500;
-        height: 44px;
+        height: 12.5vh;
+        min-height: 44px;
         display: flex;
         align-items: center;
         justify-content: flex-start;
@@ -418,14 +423,6 @@
         text-transform: none;
       }
 
-      /* 响应式字体大小 */
-      @media (min-width: 641px) {
-        .history-item {
-          font-size: 14.67px;
-          height: 44px;
-          min-height: 44px;
-        }
-      }
       .history-item:hover {
         background: rgba(200, 200, 200, 0.3);
       }
