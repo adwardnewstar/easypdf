@@ -58,7 +58,7 @@
         background: rgba(0, 0, 0, 0.6);
         color: white;
         padding: 8px 16px;
-        border-radius: 20px;
+        border-radius: 10px;
         font-size: 14px;
         pointer-events: none;
         z-index: 2;
@@ -122,24 +122,20 @@
 
       /* 图标样式 */
       .btn-icon {
-        width: 1.5vw;
-        height: 1.5vw;
-        min-width: 24px;
-        min-height: 24px;
-        max-width: 48px;
-        max-height: 48px;
+        width: 50%;
+        height: 50%;
+        min-width: 20px;
+        min-height: 20px;
         fill: #c2c2c2;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
       }
       .fixed-btn-icon {
-        width: 2vw;
-        height: 2vw;
-        min-width: 32px;
-        min-height: 32px;
-        max-width: 64px;
-        max-height: 64px;
+        width: 50%;
+        height: 50%;
+        min-width: 28px;
+        min-height: 28px;
         fill: #c2c2c2;
         image-rendering: pixelated;
         image-rendering: crisp-edges;
@@ -383,35 +379,73 @@
       /* 历史下拉菜单 */
       .history-menu {
         position: fixed;
-        background: rgba(20, 20, 28, 0.95);
+        background: rgba(200, 200, 200, 0.15);
         backdrop-filter: blur(20px);
-        border-radius: 20px;
+        border-radius: 10px;
         border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 8px 0;
+        padding: 0;
         z-index: 210;
         min-width: 180px;
         max-width: 240px;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
         display: none;
         flex-direction: column;
-        max-height: 50vh;
-        overflow-y: auto;
+        max-height: none;
+        overflow: visible;
+        font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
       }
       .history-menu.show {
         display: flex;
       }
       .history-item {
-        padding: 1.5vh 2vh;
-        color: white;
-        font-size: 2vh;
+        padding: 0 12px;
+        color: black;
+        font-size: 19.07px;
+        font-weight: 500;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
         cursor: pointer;
         transition: background 0.1s;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
+        user-select: none;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+      }
+
+      /* 响应式字体大小 */
+      @media (min-width: 641px) {
+        .history-item {
+          font-size: 14.67px;
+          height: 44px;
+          min-height: 44px;
+        }
       }
       .history-item:hover {
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(200, 200, 200, 0.3);
+      }
+
+      /* 电脑端历史记录菜单 */
+      @media (min-width: 641px) {
+        .history-menu {
+          background: rgba(200, 200, 200, 0.15);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 10px;
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+          padding: 0;
+          min-width: 200px;
+          max-width: 300px;
+          flex-direction: column;
+          gap: 0;
+          max-height: none;
+          overflow: visible;
+        }
       }
 
       /* 锁定模式隐藏除锁定按钮外的所有控件 */
@@ -573,46 +607,41 @@
       .login-form {
         background: #c2c2c2;
         backdrop-filter: blur(20px);
-        border-radius: 12px;
+        border-radius: 6px;
         border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 24px;
-        width: 33.33vw;
-        max-width: 400px;
+        padding: 4vh;
+        width: 40vh;
         min-width: 280px;
-        height: 33.33vh;
-        max-height: 600px;
-        min-height: 300px;
+        max-width: 90vw;
+        height: auto;
+        max-height: 80vh;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         display: flex;
         flex-direction: column;
+        justify-content: center;
+        gap: 2vh;
       }
       .login-title {
         color: #333333;
-        font-size: 2.5vh;
+        font-size: 3vh;
         font-weight: 600;
         text-align: center;
-        margin-bottom: 2vh;
+        margin-bottom: 1vh;
       }
       .login-input-group {
-        margin-bottom: 2vh;
-      }
-      .login-label {
-        display: block;
-        color: rgba(255, 255, 255, 0.8);
-        font-size: 1.8vh;
-        font-weight: 500;
-        margin-bottom: 1vh;
+        margin-bottom: 0;
       }
       .login-input {
         width: 100%;
         background: white;
         border: 1px solid #999999;
         border-radius: 6px;
-        padding: 1.5vh 2vh;
+        padding: 2vh 2.5vh;
         color: #333333;
-        font-size: 2vh;
+        font-size: 2.2vh;
         outline: none;
         transition: all 0.2s ease;
+        box-sizing: border-box;
       }
       .login-input:focus {
         border-color: #ff9800;
@@ -623,13 +652,13 @@
         background: #ff9800;
         border: none;
         border-radius: 6px;
-        padding: 1.5vh;
+        padding: 2vh;
         color: white;
-        font-size: 2vh;
+        font-size: 2.2vh;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
-        margin-top: 2vh;
+        margin-top: 1vh;
       }
       .login-button:hover {
         background: #f57c00;
@@ -640,10 +669,10 @@
       }
       .login-error {
         color: #f44336;
-        font-size: 14px;
+        font-size: 1.8vh;
         text-align: center;
-        margin-top: 16px;
-        min-height: 20px;
+        margin-top: 1vh;
+        min-height: 2.5vh;
       }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1258,7 +1287,7 @@
             const div = document.createElement("div");
             div.className = "history-item";
             div.textContent = item.file_name || "未命名文件";
-            div.onclick = async (e) => {
+            div.ondblclick = async (e) => {
               e.stopPropagation();
               historyMenu.classList.remove("show");
               isMenuOpen = false;
@@ -1268,7 +1297,9 @@
           });
         }
         const btnRect = historyBtn.getBoundingClientRect();
-        historyMenu.style.top = `${btnRect.bottom + 8}px`;
+        const topBarRect = topBar.getBoundingClientRect();
+        // 所有设备：在功能栏下面展开
+        historyMenu.style.top = `${topBarRect.bottom + 8}px`;
         historyMenu.style.left = `${btnRect.left}px`;
         historyMenu.classList.add("show");
         isMenuOpen = true;
@@ -1565,11 +1596,7 @@
       }
 
       async function init() {
-        // 每次页面加载时自动登出，强制用户重新登录
-        await supabaseClient.auth.signOut();
-        isLoggedIn = false;
-
-        // 检查登录状态
+        // 检查登录状态，如果已登录则保持登录状态
         await checkAuthStatus();
 
         // 初始化按钮位置
@@ -1896,33 +1923,153 @@
           if (locked) return;
           toggleFullscreen();
         });
-        // 重置按钮：切换最佳比例和全内容可看比例
+        // 重置按钮：切换最佳比例和全内容可看比例（带平滑动画）
         let isUsingBestScale = false;
+        let isAnimating = false;
         resetBtn.addEventListener("click", async () => {
-          if (locked) return;
+          if (locked || isAnimating) return;
 
+          isAnimating = true;
           const bestScale = localStorage.getItem("easyPdfBestScale");
           if (bestScale) {
             if (isUsingBestScale) {
               // 切换到全内容可看比例
-              await resetView();
-              showToast("已切换到全内容可看比例");
+              const targetScale = calculateResetScale();
+              await animateScale(targetScale, "已切换到全内容可看比例");
             } else {
               // 切换到最佳比例
-              await scaleAtPoint(
-                parseFloat(bestScale),
-                canvas.width / 2,
-                canvas.height / 2,
-              );
-              showToast("已切换到最佳比例");
+              await animateScale(parseFloat(bestScale), "已切换到最佳比例");
             }
             isUsingBestScale = !isUsingBestScale;
           } else {
             // 没有最佳比例，显示全内容可看比例
-            await resetView();
-            showToast("已重置到全内容可看比例");
+            const targetScale = calculateResetScale();
+            await animateScale(targetScale, "已重置到全内容可看比例");
           }
+          isAnimating = false;
         });
+
+        // 计算全内容可看比例
+        function calculateResetScale() {
+          if (!currentPage) return 1;
+          const rect = canvasArea.getBoundingClientRect();
+          let canvasW = rect.width;
+          let canvasH = rect.height;
+          if (canvasW < 10) canvasW = window.innerWidth;
+          if (canvasH < 10) canvasH = window.innerHeight;
+          canvasW = canvasW * dpr;
+          canvasH = canvasH * dpr;
+          const viewport = currentPage.getViewport({ scale: 1 });
+          const imgW = viewport.width * dpr;
+          const imgH = viewport.height * dpr;
+          let newScale = Math.min(canvasW / imgW, canvasH / imgH);
+          return Math.min(8, newScale);
+        }
+
+        // 平滑缩放动画
+        async function animateScale(targetScale, toastMessage) {
+          const startScale = scale;
+          const startOffsetX = offsetX;
+          const startOffsetY = offsetY;
+          const duration = 600; // 动画持续时间600ms
+          const startTime = performance.now();
+
+          // 保存起始状态的渲染结果
+          const startCanvas = document.createElement("canvas");
+          startCanvas.width = canvas.width;
+          startCanvas.height = canvas.height;
+          const startCtx = startCanvas.getContext("2d");
+          startCtx.drawImage(canvas, 0, 0);
+
+          return new Promise((resolve) => {
+            function animate(currentTime) {
+              const elapsed = currentTime - startTime;
+              const progress = Math.min(elapsed / duration, 1);
+
+              // 使用easeOutCubic缓动函数
+              const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+              // 计算当前缩放比例
+              const currentScaleRatio =
+                startScale + (targetScale - startScale) * easeProgress;
+              const scaleFactor = currentScaleRatio / startScale;
+
+              // 清除画布
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+              // 计算缩放后的尺寸和位置（以屏幕中心为锚点）
+              const centerX = canvas.width / 2;
+              const centerY = canvas.height / 2;
+              const scaledWidth = startCanvas.width * scaleFactor;
+              const scaledHeight = startCanvas.height * scaleFactor;
+              const drawX = centerX - scaledWidth / 2;
+              const drawY = centerY - scaledHeight / 2;
+
+              // 绘制缩放后的起始渲染结果
+              ctx.drawImage(
+                startCanvas,
+                drawX,
+                drawY,
+                scaledWidth,
+                scaledHeight,
+              );
+
+              // 更新缩放输入框
+              updateScaleInput();
+
+              if (progress < 1) {
+                requestAnimationFrame(animate);
+              } else {
+                // 动画完成，更新全局变量并渲染最终结果
+                scale = targetScale;
+
+                // 计算最终偏移量（以PDF文件中心为锚点）
+                if (currentPage) {
+                  try {
+                    const viewport = currentPage.getViewport({ scale: 1 });
+                    const pageWidth = viewport.width;
+                    const pageHeight = viewport.height;
+                    const pdfCenterX = (pageWidth * targetScale * dpr) / 2;
+                    const pdfCenterY = (pageHeight * targetScale * dpr) / 2;
+                    const screenCenterX = canvas.width / 2;
+                    const screenCenterY = canvas.height / 2;
+                    offsetX = screenCenterX - pdfCenterX;
+                    offsetY = screenCenterY - pdfCenterY;
+                  } catch (e) {
+                    // 回退到屏幕中心锚点
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    offsetX =
+                      centerX -
+                      (centerX - startOffsetX) * (targetScale / startScale);
+                    offsetY =
+                      centerY -
+                      (centerY - startOffsetY) * (targetScale / startScale);
+                  }
+                } else {
+                  // 回退到屏幕中心锚点
+                  const centerX = canvas.width / 2;
+                  const centerY = canvas.height / 2;
+                  offsetX =
+                    centerX -
+                    (centerX - startOffsetX) * (targetScale / startScale);
+                  offsetY =
+                    centerY -
+                    (centerY - startOffsetY) * (targetScale / startScale);
+                }
+
+                // 渲染最终清晰结果
+                refreshRender().then(() => {
+                  updateThumbMarker();
+                  showToast(toastMessage);
+                  resolve();
+                });
+              }
+            }
+
+            requestAnimationFrame(animate);
+          });
+        }
         fileBtn.addEventListener("click", () => {
           if (locked) return;
           // 记录当前全屏状态，文件选择器关闭后恢复
