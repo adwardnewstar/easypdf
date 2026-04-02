@@ -394,14 +394,16 @@
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
         display: none;
         flex-direction: column;
+        max-height: 50vh;
+        overflow-y: auto;
       }
       .history-menu.show {
         display: flex;
       }
       .history-item {
-        padding: 10px 16px;
+        padding: 1.5vh 2vh;
         color: white;
-        font-size: 14px;
+        font-size: 2vh;
         cursor: pointer;
         transition: background 0.1s;
         white-space: nowrap;
@@ -574,35 +576,41 @@
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.2);
         padding: 24px;
-        width: 90%;
+        width: 33.33vw;
         max-width: 400px;
+        min-width: 280px;
+        height: 33.33vh;
+        max-height: 600px;
+        min-height: 300px;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
       }
       .login-title {
         color: #333333;
-        font-size: 24px;
+        font-size: 2.5vh;
         font-weight: 600;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 2vh;
       }
       .login-input-group {
-        margin-bottom: 16px;
+        margin-bottom: 2vh;
       }
       .login-label {
         display: block;
         color: rgba(255, 255, 255, 0.8);
-        font-size: 14px;
+        font-size: 1.8vh;
         font-weight: 500;
-        margin-bottom: 8px;
+        margin-bottom: 1vh;
       }
       .login-input {
         width: 100%;
         background: white;
         border: 1px solid #999999;
         border-radius: 6px;
-        padding: 10px 14px;
+        padding: 1.5vh 2vh;
         color: #333333;
-        font-size: 16px;
+        font-size: 2vh;
         outline: none;
         transition: all 0.2s ease;
       }
@@ -615,13 +623,13 @@
         background: #ff9800;
         border: none;
         border-radius: 6px;
-        padding: 10px;
+        padding: 1.5vh;
         color: white;
-        font-size: 16px;
+        font-size: 2vh;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
-        margin-top: 6px;
+        margin-top: 2vh;
       }
       .login-button:hover {
         background: #f57c00;
