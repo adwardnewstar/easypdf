@@ -317,7 +317,6 @@
       .thumb-card:not(.collapsed) {
         width: 12.5vw;
         min-width: 52px;
-        max-width: 90px;
         height: auto;
         max-height: 45vh;
         padding: 12px 8px;
@@ -333,21 +332,27 @@
         cursor: pointer;
         font-size: 20px;
         color: white;
-        width: 44px;
-        height: 44px;
+        width: 3.5vh;
+        height: 3.5vh;
+        min-width: 44px;
+        min-height: 44px;
       }
       .thumb-card:not(.collapsed) .pin-toggle {
         position: absolute;
         top: 8px;
         right: 8px;
-        width: 32px;
-        height: 32px;
+        width: 2.5vh;
+        height: 2.5vh;
+        min-width: 32px;
+        min-height: 32px;
         font-size: 14px;
         background: #c3c3c3;
       }
       .thumb-card:not(.collapsed) .pin-icon {
-        width: 32px;
-        height: 32px;
+        width: 50%;
+        height: 50%;
+        min-width: 16px;
+        min-height: 16px;
       }
       .thumb-inner {
         position: relative;
@@ -388,7 +393,7 @@
         padding: 0;
         z-index: 210;
         min-width: 50vw;
-        max-width: 80vw;
+        max-width: 90vw;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
         display: none;
         flex-direction: column;
@@ -428,14 +433,14 @@
       /* 电脑端历史记录菜单 */
       @media (min-width: 641px) {
         .history-menu {
-          background: rgba(200, 200, 200, 0.15);
+          background: rgba(200, 200, 200, 0.3);
           backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.3);
           border-radius: 10px;
           box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
           padding: 0;
           min-width: 50vw;
-          max-width: 80vw;
+          max-width: 90vw;
           flex-direction: column;
           gap: 0;
           max-height: none;
