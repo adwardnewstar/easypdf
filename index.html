@@ -97,7 +97,7 @@
         flex-wrap: nowrap;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 2vh;
       }
 
       .circle-btn {
@@ -1921,6 +1921,38 @@
             document.removeEventListener("click", closeControlBar);
           }
         }
+        // 为所有按钮添加长按重新载入功能
+        const buttons = [
+          fileBtn,
+          zoomOutBtn,
+          zoomInBtn,
+          historyBtn,
+          fullscreenBtn,
+          resetBtn,
+        ];
+        buttons.forEach((btn) => {
+          let longPressTimer;
+          btn.addEventListener("mousedown", () => {
+            longPressTimer = setTimeout(() => {
+              location.reload();
+            }, 1000);
+          });
+          btn.addEventListener("mouseup", () => {
+            clearTimeout(longPressTimer);
+          });
+          btn.addEventListener("mouseleave", () => {
+            clearTimeout(longPressTimer);
+          });
+          btn.addEventListener("touchstart", () => {
+            longPressTimer = setTimeout(() => {
+              location.reload();
+            }, 1000);
+          });
+          btn.addEventListener("touchend", () => {
+            clearTimeout(longPressTimer);
+          });
+        });
+
         historyBtn.addEventListener("click", toggleHistoryMenu);
         fullscreenBtn.addEventListener("click", () => {
           if (locked) return;
