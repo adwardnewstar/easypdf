@@ -182,6 +182,9 @@
         appearance: none;
         -webkit-appearance: none;
         -moz-appearance: textfield;
+        /* 允许文本选择，以便输入 */
+        user-select: text;
+        -webkit-user-select: text;
       }
       .scale-input::-webkit-outer-spin-button,
       .scale-input::-webkit-inner-spin-button {
@@ -978,11 +981,30 @@
       // 刷新完整渲染（重新渲染PDF到离屏画布）
       async function refreshRender() {
         if (!currentPage) return;
+
+        // 如果正在渲染，使用队列机制而不是直接返回
         if (isRendering) {
-          await new Promise((r) => setTimeout(r, 50));
-          if (isRendering) return;
+          // 设置一个标志，表示有新的渲染请求
+          window.pendingRender = true;
+          return;
         }
+
         isRendering = true;
+        window.pendingRender = false;
+
+        // 设置超时机制，确保isRendering不会永远为true
+        const renderTimeout = setTimeout(() => {
+          if (isRendering) {
+            console.warn("渲染超时，强制重置渲染状态");
+            isRendering = false;
+            // 如果有待处理的渲染请求，执行它
+            if (window.pendingRender) {
+              window.pendingRender = false;
+              refreshRender();
+            }
+          }
+        }, 5000); // 5秒超时
+
         try {
           const viewport = currentPage.getViewport({ scale: 1 });
           const renderScale = scale * dpr;
@@ -996,18 +1018,47 @@
           const renderViewport = currentPage.getViewport({
             scale: renderScale,
           });
-          await currentPage.render({
-            canvasContext: offCtx,
-            viewport: renderViewport,
-            background: "white",
-          }).promise;
+
+          // 使用 requestIdleCallback 将渲染操作分解，避免阻塞主线程
+          await new Promise((resolve) => {
+            const renderTask = () => {
+              currentPage
+                .render({
+                  canvasContext: offCtx,
+                  viewport: renderViewport,
+                  background: "white",
+                })
+                .promise.then(() => {
+                  resolve();
+                })
+                .catch((renderErr) => {
+                  console.error("渲染操作失败", renderErr);
+                  resolve();
+                });
+            };
+
+            // 使用 requestIdleCallback 如果可用，否则使用 setTimeout
+            if (typeof requestIdleCallback !== "undefined") {
+              requestIdleCallback(renderTask, { timeout: 100 });
+            } else {
+              setTimeout(renderTask, 0);
+            }
+          });
+
           drawCanvas();
           updateScaleInput();
           updateThumbMarker();
         } catch (err) {
           console.error("渲染失败", err);
         } finally {
+          clearTimeout(renderTimeout);
           isRendering = false;
+          // 如果有待处理的渲染请求，执行它
+          if (window.pendingRender) {
+            window.pendingRender = false;
+            // 使用 setTimeout 让出主线程
+            setTimeout(() => refreshRender(), 0);
+          }
         }
       }
 
@@ -1036,6 +1087,8 @@
         let newScale = Math.min(canvasW / imgW, canvasH / imgH);
         newScale = Math.min(8, newScale);
         scale = newScale;
+        // 让出主线程，避免阻塞UI
+        await new Promise((resolve) => setTimeout(resolve, 0));
         // 等待渲染完成
         await refreshRender();
         // 重新获取渲染后的尺寸并居中
@@ -1052,7 +1105,7 @@
       // 中心缩放
       async function scaleAtPoint(newScale, centerX, centerY) {
         if (!currentPage || locked) return;
-        newScale = Math.min(1000, newScale); // 解锁到1000倍放大
+        newScale = Math.min(2000, newScale); // 解锁到2000倍放大
         if (Math.abs(newScale - scale) < 0.001) return;
         const oldScale = scale;
         const newOffX = centerX - (centerX - offsetX) * (newScale / oldScale);
@@ -1076,11 +1129,19 @@
           if (pdfDoc) pdfDoc.destroy?.();
           currentPage = null;
           offscreenCanvas = null;
+
+          // 使用 setTimeout 将PDF加载操作分解，避免阻塞主线程
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
           const task = pdfjsLib.getDocument({
             data: buffer,
             useSystemFonts: true,
           });
           pdfDoc = await task.promise;
+
+          // 再次使用 setTimeout 让出主线程
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
           currentPage = await pdfDoc.getPage(1);
           scale = 1.0;
           offsetX = 0;
@@ -1306,7 +1367,6 @@
       // 显示/隐藏历史菜单（点击切换）
       let isMenuOpen = false;
       function toggleHistoryMenu() {
-        if (locked) return;
         if (isMenuOpen) {
           historyMenu.classList.remove("show");
           isMenuOpen = false;
@@ -1345,7 +1405,7 @@
                 const div = document.createElement("div");
                 div.className = "history-item";
                 div.textContent = item.file_name || "未命名文件";
-                div.ondblclick = async (e) => {
+                div.onclick = async (e) => {
                   e.stopPropagation();
                   // 移除所有历史菜单项的选中状态
                   const historyItems =
@@ -1374,7 +1434,9 @@
 
         // 点击外部关闭
         const closeHandler = (e) => {
-          if (!historyMenu.contains(e.target) && e.target !== historyBtn) {
+          // 检查点击目标是否在历史按钮内（包括按钮内的图标）
+          const isClickOnHistoryBtn = historyBtn.contains(e.target);
+          if (!historyMenu.contains(e.target) && !isClickOnHistoryBtn) {
             historyMenu.classList.remove("show");
             isMenuOpen = false;
             document.removeEventListener("click", closeHandler);
@@ -1400,12 +1462,32 @@
         thumbCanvas.style.width = `${thumbWidth}px`;
         thumbCanvas.style.height = `${thumbHeight}px`;
         try {
-          await currentPage.render({
-            canvasContext: thumbCtx,
-            viewport,
-            background: "white",
-          }).promise;
-          updateThumbMarker();
+          // 使用 requestIdleCallback 让出主线程，避免阻塞UI
+          await new Promise((resolve) => {
+            const renderTask = () => {
+              currentPage
+                .render({
+                  canvasContext: thumbCtx,
+                  viewport,
+                  background: "white",
+                })
+                .promise.then(() => {
+                  updateThumbMarker();
+                  resolve();
+                })
+                .catch((e) => {
+                  console.warn(e);
+                  resolve();
+                });
+            };
+
+            // 使用 requestIdleCallback 如果可用，否则使用 setTimeout
+            if (typeof requestIdleCallback !== "undefined") {
+              requestIdleCallback(renderTask, { timeout: 100 });
+            } else {
+              setTimeout(renderTask, 0);
+            }
+          });
         } catch (e) {
           console.warn(e);
         }
@@ -1550,6 +1632,11 @@
         isDragging = false;
         canvasArea.style.cursor = "grab";
       }
+      // 滚轮事件防抖
+      let wheelTimeout = null;
+      let pendingWheelScale = null;
+      let pendingWheelCenter = null;
+
       function onWheel(e) {
         if (!currentPage || locked) return;
         e.preventDefault();
@@ -1557,7 +1644,32 @@
         const cx = (e.clientX - rect.left) * dpr;
         const cy = (e.clientY - rect.top) * dpr;
         const delta = e.deltaY > 0 ? 0.92 : 1.08;
-        scaleAtPoint(scale * delta, cx, cy);
+
+        // 累积缩放比例
+        if (pendingWheelScale === null) {
+          pendingWheelScale = scale;
+          pendingWheelCenter = { x: cx, y: cy };
+        }
+        pendingWheelScale *= delta;
+
+        // 清除之前的定时器
+        if (wheelTimeout) {
+          clearTimeout(wheelTimeout);
+        }
+
+        // 设置新的定时器，延迟执行缩放
+        wheelTimeout = setTimeout(() => {
+          if (pendingWheelScale !== null && pendingWheelCenter !== null) {
+            scaleAtPoint(
+              pendingWheelScale,
+              pendingWheelCenter.x,
+              pendingWheelCenter.y,
+            );
+            pendingWheelScale = null;
+            pendingWheelCenter = null;
+          }
+          wheelTimeout = null;
+        }, 50); // 50ms防抖延迟
       }
       function onTouchStart(e) {
         e.preventDefault();
@@ -1592,6 +1704,9 @@
           touchStartOffsetY = offsetY;
         }
       }
+      // 触摸移动事件防抖
+      let touchMoveTimeout = null;
+
       function onTouchMove(e) {
         e.preventDefault();
         const touches = e.touches;
@@ -1620,7 +1735,16 @@
           offsetY = cy - (touchStartCenter.y - touchStartOffsetY) * ratio;
           scale = newScale;
           updateScaleInput();
-          refreshRender();
+
+          // 使用防抖机制，避免频繁调用 refreshRender
+          if (touchMoveTimeout) {
+            clearTimeout(touchMoveTimeout);
+          }
+          touchMoveTimeout = setTimeout(() => {
+            refreshRender();
+            touchMoveTimeout = null;
+          }, 16); // 约60fps的防抖延迟
+
           touchStartDistance = curDist;
           touchStartScale = scale;
           touchStartOffsetX = offsetX;
@@ -1782,27 +1906,37 @@
           if (locked) return;
           let val = parseFloat(scaleInput.value);
           if (isNaN(val)) val = 100;
-          val = Math.min(800, val);
+          val = Math.min(200000, val); // 统一为2000倍 = 200000%
           scaleAtPoint(val / 100, canvas.width / 2, canvas.height / 2);
         });
 
-        // 长按输入框，显示控制条
+        // 长按输入框，存储最佳比例
         let longPressTimer;
         let controlBar;
         let controlBarValue = 0;
+        let isLongPressTriggered = false;
 
         scaleInput.addEventListener("touchstart", (e) => {
-          e.preventDefault(); // 阻止默认行为，不呼出键盘
+          isLongPressTriggered = false;
           startLongPress();
         });
 
         scaleInput.addEventListener("mousedown", (e) => {
-          e.preventDefault(); // 阻止默认行为，不呼出键盘
+          // 只有左键点击才触发长按
+          if (e.button !== 0) return;
+          isLongPressTriggered = false;
           startLongPress();
+        });
+
+        // 允许输入框获得焦点并输入
+        scaleInput.addEventListener("focus", () => {
+          // 清除长按定时器，避免干扰输入
+          cancelLongPress();
         });
 
         function startLongPress() {
           longPressTimer = setTimeout(async () => {
+            isLongPressTriggered = true;
             // 存储当前比例为最佳比例到本地
             localStorage.setItem("easyPdfBestScale", scale);
 
@@ -2014,29 +2148,54 @@
           resetBtn,
         ];
         buttons.forEach((btn) => {
-          let longPressTimer;
-          btn.addEventListener("mousedown", () => {
+          let longPressTimer = null;
+          let isLongPress = false;
+          let isMouseDown = false;
+
+          btn.addEventListener("mousedown", (e) => {
+            isMouseDown = true;
+            isLongPress = false;
             longPressTimer = setTimeout(() => {
+              isLongPress = true;
               location.reload();
             }, 1000);
           });
           btn.addEventListener("mouseup", () => {
+            isMouseDown = false;
             clearTimeout(longPressTimer);
+            longPressTimer = null;
           });
           btn.addEventListener("mouseleave", () => {
+            isMouseDown = false;
             clearTimeout(longPressTimer);
+            longPressTimer = null;
           });
-          btn.addEventListener("touchstart", () => {
+          btn.addEventListener("touchstart", (e) => {
+            isMouseDown = true;
+            isLongPress = false;
             longPressTimer = setTimeout(() => {
+              isLongPress = true;
               location.reload();
             }, 1000);
           });
           btn.addEventListener("touchend", () => {
+            isMouseDown = false;
             clearTimeout(longPressTimer);
+            longPressTimer = null;
           });
-        });
 
-        historyBtn.addEventListener("click", toggleHistoryMenu);
+          // 为historyBtn添加点击事件处理
+          if (btn === historyBtn) {
+            btn.addEventListener("click", (e) => {
+              // 只有在不是长按且鼠标/手指已经抬起时才执行
+              if (isLongPress || isMouseDown) {
+                e.stopPropagation();
+                return;
+              }
+              toggleHistoryMenu();
+            });
+          }
+        });
         fullscreenBtn.addEventListener("click", () => {
           if (locked) return;
           toggleFullscreen();
@@ -2177,11 +2336,14 @@
                 }
 
                 // 渲染最终清晰结果
-                refreshRender().then(() => {
-                  updateThumbMarker();
-                  showToast(toastMessage);
-                  resolve();
-                });
+                // 使用 setTimeout 让出主线程，避免阻塞UI
+                setTimeout(() => {
+                  refreshRender().then(() => {
+                    updateThumbMarker();
+                    showToast(toastMessage);
+                    resolve();
+                  });
+                }, 0);
               }
             }
 
