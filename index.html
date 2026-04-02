@@ -219,6 +219,39 @@
         cursor: grabbing;
         transform: translate(-50%, -50%) scale(1.1);
       }
+
+      /* 提示信息 */
+      .toast {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 10000;
+        animation: fadeInOut 2s ease-in-out;
+      }
+      @keyframes fadeInOut {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.8);
+        }
+        20% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        80% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.8);
+        }
+      }
       .scale-input:focus {
         border-color: #ff9800;
       }
@@ -825,6 +858,10 @@
           } = await supabaseClient.auth.getUser();
           if (user) {
             isLoggedIn = true;
+            // 登录后同步最佳比例
+            await loadBestScaleFromSupabase();
+            // 登录后清理历史记录，确保只保留5个文件
+            await limitStorageFiles();
           }
         } catch (err) {
           console.error("检查登录状态失败", err);
@@ -1644,8 +1681,22 @@
         });
 
         function startLongPress() {
-          longPressTimer = setTimeout(() => {
-            showControlBar();
+          longPressTimer = setTimeout(async () => {
+            // 存储当前比例为最佳比例到本地
+            localStorage.setItem("easyPdfBestScale", scale);
+
+            // 如果用户已登录，同步到Supabase
+            if (isLoggedIn) {
+              try {
+                await syncBestScaleToSupabase(scale);
+                showToast("已存储最佳比例（已同步到云端）");
+              } catch (error) {
+                console.error("同步最佳比例失败:", error);
+                showToast("已存储最佳比例（仅本地）");
+              }
+            } else {
+              showToast("已存储最佳比例（仅本地）");
+            }
           }, 500); // 500ms 长按触发
         }
 
@@ -1653,6 +1704,73 @@
           if (longPressTimer) {
             clearTimeout(longPressTimer);
           }
+        }
+
+        // 显示提示信息
+        function showToast(message) {
+          const toast = document.createElement("div");
+          toast.className = "toast";
+          toast.textContent = message;
+          document.body.appendChild(toast);
+
+          setTimeout(() => {
+            toast.remove();
+          }, 2000);
+        }
+
+        // 同步最佳比例到Supabase
+        async function syncBestScaleToSupabase(scaleValue) {
+          if (!isLoggedIn) return;
+
+          const {
+            data: { user },
+          } = await supabaseClient.auth.getUser();
+          if (!user) return;
+
+          // 存储最佳比例到用户配置表
+          const { error } = await supabaseClient.from("user_settings").upsert(
+            {
+              user_id: user.id,
+              best_scale: scaleValue,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "user_id",
+            },
+          );
+
+          if (error) {
+            throw error;
+          }
+        }
+
+        // 从Supabase加载最佳比例
+        async function loadBestScaleFromSupabase() {
+          if (!isLoggedIn) return;
+
+          const {
+            data: { user },
+          } = await supabaseClient.auth.getUser();
+          if (!user) return;
+
+          const { data, error } = await supabaseClient
+            .from("user_settings")
+            .select("best_scale")
+            .eq("user_id", user.id)
+            .single();
+
+          if (error) {
+            console.error("加载最佳比例失败:", error);
+            return null;
+          }
+
+          if (data && data.best_scale) {
+            // 同步到本地存储
+            localStorage.setItem("easyPdfBestScale", data.best_scale);
+            return data.best_scale;
+          }
+
+          return null;
         }
 
         scaleInput.addEventListener("touchend", cancelLongPress);
@@ -1770,9 +1888,32 @@
           if (locked) return;
           toggleFullscreen();
         });
+        // 重置按钮：切换最佳比例和全内容可看比例
+        let isUsingBestScale = false;
         resetBtn.addEventListener("click", async () => {
           if (locked) return;
-          await resetView();
+
+          const bestScale = localStorage.getItem("easyPdfBestScale");
+          if (bestScale) {
+            if (isUsingBestScale) {
+              // 切换到全内容可看比例
+              await resetView();
+              showToast("已切换到全内容可看比例");
+            } else {
+              // 切换到最佳比例
+              await scaleAtPoint(
+                parseFloat(bestScale),
+                canvas.width / 2,
+                canvas.height / 2,
+              );
+              showToast("已切换到最佳比例");
+            }
+            isUsingBestScale = !isUsingBestScale;
+          } else {
+            // 没有最佳比例，显示全内容可看比例
+            await resetView();
+            showToast("已重置到全内容可看比例");
+          }
         });
         fileBtn.addEventListener("click", () => {
           if (locked) return;
