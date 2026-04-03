@@ -115,11 +115,11 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
+        color: #333333; /* 设置文字颜色，影响 SVG 的 currentColor */
         transition:
           transform 0.2s ease,
           box-shadow 0.2s ease;
         font-size: 20px;
-        color: white;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         /* 强制硬件加速，减少残影 */
         transform: translateZ(0);
@@ -139,6 +139,13 @@
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
+        transition: filter 0.3s ease;
+      }
+      /* 最佳比例按钮图标样式 */
+      #bestScaleIcon {
+        stroke: #333333; /* 黑色描边 */
+        fill: none; /* 空心 */
+        transition: all 0.3s ease;
       }
       .fixed-btn-icon {
         width: 50%;
@@ -149,6 +156,7 @@
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
+        transition: filter 0.3s ease;
       }
       .pin-icon {
         width: 2vw;
@@ -162,13 +170,6 @@
       }
 
       /* 上传反馈颜色 */
-      .circle-btn.upload-success {
-        background: #2e7d32 !important;
-      }
-      .circle-btn.upload-error {
-        background: #c62828 !important;
-      }
-
       .scale-input {
         background: rgba(20, 20, 28, 0.75);
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -285,7 +286,10 @@
         color: white;
         transition:
           transform 0.05s,
-          opacity 0.2s;
+          opacity 0.2s,
+          background 0.3s ease;
+        padding: 0;
+        outline: none;
       }
       .fixed-btn:active {
         transform: scale(0.96);
@@ -307,6 +311,9 @@
         display: flex;
         flex-direction: column;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        padding: 0;
+        outline: none;
+        cursor: pointer;
       }
       .thumb-card.collapsed {
         width: 66px !important;
@@ -472,7 +479,8 @@
       /* 锁定模式隐藏除锁定按钮外的所有控件 */
       .locked-mode .top-bar,
       .locked-mode .thumb-card,
-      .locked-mode .history-menu {
+      .locked-mode .history-menu,
+      .locked-mode #thumbCard {
         display: none !important;
       }
       .locked-mode {
@@ -737,7 +745,7 @@
             autocomplete="off"
           />
         </div>
-        <button class="login-button" id="loginButton">登录</button>
+        <button class="login-button" id="loginButton">LOGIN</button>
         <div class="login-error" id="loginError"></div>
       </div>
     </div>
@@ -754,13 +762,31 @@
           <button class="circle-btn" id="fileBtn" title="打开本地PDF">
             <img src="assets/icon/打开.svg" alt="打开" class="btn-icon" />
           </button>
-          <button class="circle-btn" id="zoomOutBtn" title="缩小">
-            <img src="assets/icon/缩小.svg" alt="缩小" class="btn-icon" />
+          <button
+            class="circle-btn"
+            id="bestScaleBtn"
+            title="最佳比例（双击保存）"
+          >
+            <svg
+              class="btn-icon"
+              id="bestScaleIcon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+              ></path>
+            </svg>
           </button>
-          <input type="text" id="scaleInput" class="scale-input" value="100" />
-          <button class="circle-btn" id="zoomInBtn" title="放大">
-            <img src="assets/icon/放大.svg" alt="放大" class="btn-icon" />
-          </button>
+          <input
+            type="text"
+            id="scaleInput"
+            class="scale-input"
+            value="100"
+            readonly
+          />
           <button class="circle-btn" id="historyBtn" title="历史记录">
             <img src="assets/icon/历史.svg" alt="历史" class="btn-icon" />
           </button>
@@ -777,20 +803,14 @@
       <div id="historyMenu" class="history-menu"></div>
 
       <!-- 左侧锁定按钮（固定） -->
-      <div id="lockBtn" class="fixed-btn" style="bottom: 30px">
+      <button id="lockBtn" class="fixed-btn" style="bottom: 30px">
         <img src="assets/icon/开锁.svg" alt="开锁" class="fixed-btn-icon" />
-      </div>
+      </button>
 
-      <!-- 右侧缩略图卡片（固定） -->
-      <div id="thumbCard" class="thumb-card collapsed" style="bottom: 30px">
-        <button id="pinToggle" class="pin-toggle">
-          <img src="assets/icon/图钉.svg" alt="图钉" class="pin-icon" />
-        </button>
-        <div class="thumb-inner" id="thumbInner">
-          <canvas id="thumbCanvas"></canvas>
-          <div id="viewportMarker" class="viewport-marker"></div>
-        </div>
-      </div>
+      <!-- 右侧语音按钮（固定） -->
+      <button id="thumbCard" class="fixed-btn" style="bottom: 30px">
+        <img src="assets/icon/语音.svg" alt="语音" class="fixed-btn-icon" />
+      </button>
 
       <div id="loadingMask" class="loading-mask" style="display: none">
         <img src="assets/icon/刷新.svg" alt="加载中" class="loading-icon" />
@@ -813,18 +833,12 @@
       const fileInput = document.getElementById("fileInput");
       const fileBtn = document.getElementById("fileBtn");
       const scaleInput = document.getElementById("scaleInput");
-      const zoomOutBtn = document.getElementById("zoomOutBtn");
-      const zoomInBtn = document.getElementById("zoomInBtn");
+      const bestScaleBtn = document.getElementById("bestScaleBtn");
       const historyBtn = document.getElementById("historyBtn");
       const fullscreenBtn = document.getElementById("fullscreenBtn");
       const resetBtn = document.getElementById("resetBtn");
       const lockBtnEl = document.getElementById("lockBtn");
       const thumbCard = document.getElementById("thumbCard");
-      const pinToggle = document.getElementById("pinToggle");
-      const thumbInner = document.getElementById("thumbInner");
-      const thumbCanvas = document.getElementById("thumbCanvas");
-      const thumbCtx = thumbCanvas.getContext("2d");
-      const viewportMarker = document.getElementById("viewportMarker");
       const app = document.getElementById("app");
       const historyMenu = document.getElementById("historyMenu");
       const loadingMask = document.getElementById("loadingMask");
@@ -836,12 +850,9 @@
       let offsetX = 0,
         offsetY = 0; // 偏移量（物理像素）
       let offscreenCanvas = null; // 离屏渲染画布
-      let thumbWidth = 0,
-        thumbHeight = 0;
       let dpr = window.devicePixelRatio || 1;
 
       let locked = false; // 锁定模式
-      let collapsed = true; // 缩略图折叠状态
 
       // 登录状态
       let isLoggedIn = false;
@@ -850,6 +861,7 @@
       let currentFileName = null;
       let currentArrayBuffer = null; // 内存缓存，用于重置
       let currentStoragePath = null; // 当前文件在Supabase中的存储路径（若有）
+      let cachedHistoryList = []; // 缓存的历史记录列表
 
       // 交互状态
       let isDragging = false;
@@ -878,14 +890,6 @@
         }
       }
 
-      // 按钮颜色反馈（绿色/红色，3秒后恢复）
-      function setFileBtnFeedback(success) {
-        fileBtn.classList.add(success ? "upload-success" : "upload-error");
-        setTimeout(() => {
-          fileBtn.classList.remove("upload-success", "upload-error");
-        }, 3000);
-      }
-
       // 登录相关函数
       async function login(email, password) {
         const loginError = document.getElementById("loginError");
@@ -904,6 +908,12 @@
 
           isLoggedIn = true;
           document.getElementById("loginOverlay").style.display = "none";
+
+          // 预加载历史记录
+          fetchHistoryList().then((items) => {
+            cachedHistoryList = items;
+          });
+
           return true;
         } catch (err) {
           loginError.textContent = "登录失败：" + err.message;
@@ -995,7 +1005,6 @@
           canvas.style.height = `${h}px`;
           if (offscreenCanvas) {
             drawCanvas();
-            updateThumbMarker();
           }
         }
       }
@@ -1076,7 +1085,6 @@
 
           drawCanvas();
           updateScaleInput();
-          updateThumbMarker();
         } catch (err) {
           console.error("渲染失败", err);
         } finally {
@@ -1094,7 +1102,6 @@
       // 仅更新平移（不重新渲染）
       function updatePan() {
         if (offscreenCanvas) drawCanvas();
-        updateThumbMarker();
       }
 
       // 重置视图为完整显示（不留边距）
@@ -1127,7 +1134,6 @@
         offsetY = (canvas.height - newH) / 2;
         // 确保画布更新
         drawCanvas();
-        updateThumbMarker();
         updateScaleInput();
       }
 
@@ -1185,7 +1191,6 @@
           offscreenCanvas.height = h;
           // 直接调用 resetView，它会计算最佳缩放比例并渲染
           await resetView();
-          if (!collapsed) generateThumbnail();
           showLoading(false);
           currentFileName = fileName;
           // 安全地复制ArrayBuffer
@@ -1265,14 +1270,17 @@
           // 检查并限制存储数量为5个
           await limitStorageFiles();
 
-          setFileBtnFeedback(true);
+          // 更新缓存的历史记录
+          fetchHistoryList().then((items) => {
+            cachedHistoryList = items;
+          });
+
           // 更新当前文件的存储路径（如果加载的是同一个文件）
           if (currentFileName === file.name) {
             currentStoragePath = storageName;
           }
         } catch (err) {
           console.error("上传失败", err);
-          setFileBtnFeedback(false);
         }
       }
 
@@ -1316,6 +1324,11 @@
               }
             }
           }
+
+          // 更新缓存的历史记录
+          fetchHistoryList().then((items) => {
+            cachedHistoryList = items;
+          });
         } catch (err) {
           console.error("限制存储文件数量失败", err);
         }
@@ -1339,7 +1352,6 @@
         // 验证是否为PDF文件
         if (fileType !== "application/pdf" && fileExtension !== "pdf") {
           console.warn("文件类型错误，只支持PDF文件");
-          setFileBtnFeedback(false);
           return;
         }
 
@@ -1409,57 +1421,42 @@
         historyMenu.style.top = `${topBarRect.bottom + 8}px`;
         historyMenu.style.left = `${btnRect.left}px`;
 
-        // 显示加载状态
-        historyMenu.innerHTML = "";
-        const loadingDiv = document.createElement("div");
-        loadingDiv.className = "history-item";
-        loadingDiv.textContent = "加载中...";
-        historyMenu.appendChild(loadingDiv);
+        // 优先使用缓存的历史记录
+        if (cachedHistoryList.length > 0) {
+          renderHistoryMenu(cachedHistoryList);
+        } else {
+          // 显示加载状态
+          historyMenu.innerHTML = "";
+          const loadingDiv = document.createElement("div");
+          loadingDiv.className = "history-item";
+          loadingDiv.textContent = "加载中...";
+          historyMenu.appendChild(loadingDiv);
 
-        // 显示菜单
-        historyMenu.classList.add("show");
-        isMenuOpen = true;
+          // 显示菜单
+          historyMenu.classList.add("show");
+          isMenuOpen = true;
 
-        // 后台获取历史文件列表
-        fetchHistoryList()
-          .then((items) => {
-            historyMenu.innerHTML = "";
-            if (items.length === 0) {
-              const div = document.createElement("div");
-              div.className = "history-item";
-              div.textContent = "暂无历史文件";
-              historyMenu.appendChild(div);
-            } else {
-              items.forEach((item) => {
-                const div = document.createElement("div");
-                div.className = "history-item";
-                div.textContent = item.file_name || "未命名文件";
-                div.onclick = async (e) => {
-                  e.stopPropagation();
-                  // 移除所有历史菜单项的选中状态
-                  const historyItems =
-                    historyMenu.querySelectorAll(".history-item");
-                  historyItems.forEach((item) => {
-                    item.classList.remove("selected");
-                  });
-                  // 添加当前项的选中状态
-                  div.classList.add("selected");
-                  historyMenu.classList.remove("show");
-                  isMenuOpen = false;
-                  await loadFromSupabase(item.storage_path, item.file_name);
-                };
-                historyMenu.appendChild(div);
-              });
-            }
-          })
-          .catch((err) => {
-            console.error("获取历史失败", err);
-            historyMenu.innerHTML = "";
-            const errorDiv = document.createElement("div");
-            errorDiv.className = "history-item";
-            errorDiv.textContent = "加载失败";
-            historyMenu.appendChild(errorDiv);
-          });
+          // 后台获取历史文件列表
+          fetchHistoryList()
+            .then((items) => {
+              cachedHistoryList = items;
+              renderHistoryMenu(items);
+            })
+            .catch((err) => {
+              console.error("获取历史失败", err);
+              historyMenu.innerHTML = "";
+              const errorDiv = document.createElement("div");
+              errorDiv.className = "history-item";
+              errorDiv.textContent = "加载失败";
+              historyMenu.appendChild(errorDiv);
+            });
+        }
+
+        // 显示菜单（如果还没有显示）
+        if (!isMenuOpen) {
+          historyMenu.classList.add("show");
+          isMenuOpen = true;
+        }
 
         // 点击外部关闭
         const closeHandler = (e) => {
@@ -1474,104 +1471,39 @@
         setTimeout(() => document.addEventListener("click", closeHandler), 10);
       }
 
-      // ==================== 缩略图 ====================
-      async function generateThumbnail() {
-        if (!currentPage || collapsed) return;
-        const container = thumbInner.getBoundingClientRect();
-        let targetH = (container.height || 120) - 8;
-        if (targetH < 30) targetH = 100;
-        const pageViewport = currentPage.getViewport({ scale: 1 });
-        let thumbScale = targetH / pageViewport.height;
-        if (thumbScale > 1) thumbScale = 1;
-        const viewport = currentPage.getViewport({ scale: thumbScale });
-        thumbWidth = viewport.width;
-        thumbHeight = viewport.height;
-        thumbCanvas.width = thumbWidth;
-        thumbCanvas.height = thumbHeight;
-        thumbCanvas.style.width = `${thumbWidth}px`;
-        thumbCanvas.style.height = `${thumbHeight}px`;
-        try {
-          // 使用 requestIdleCallback 让出主线程，避免阻塞UI
-          await new Promise((resolve) => {
-            const renderTask = () => {
-              currentPage
-                .render({
-                  canvasContext: thumbCtx,
-                  viewport,
-                  background: "white",
-                })
-                .promise.then(() => {
-                  updateThumbMarker();
-                  resolve();
-                })
-                .catch((e) => {
-                  console.warn(e);
-                  resolve();
-                });
+      // 渲染历史记录菜单
+      function renderHistoryMenu(items) {
+        historyMenu.innerHTML = "";
+        if (items.length === 0) {
+          const div = document.createElement("div");
+          div.className = "history-item";
+          div.textContent = "暂无历史文件";
+          historyMenu.appendChild(div);
+        } else {
+          items.forEach((item) => {
+            const div = document.createElement("div");
+            div.className = "history-item";
+            div.textContent = item.file_name || "未命名文件";
+            div.onclick = async (e) => {
+              e.stopPropagation();
+              // 移除所有历史菜单项的选中状态
+              const historyItems =
+                historyMenu.querySelectorAll(".history-item");
+              historyItems.forEach((item) => {
+                item.classList.remove("selected");
+              });
+              // 添加当前项的选中状态
+              div.classList.add("selected");
+              historyMenu.classList.remove("show");
+              isMenuOpen = false;
+              await loadFromSupabase(item.storage_path, item.file_name);
             };
-
-            // 使用 requestIdleCallback 如果可用，否则使用 setTimeout
-            if (typeof requestIdleCallback !== "undefined") {
-              requestIdleCallback(renderTask, { timeout: 100 });
-            } else {
-              setTimeout(renderTask, 0);
-            }
+            historyMenu.appendChild(div);
           });
-        } catch (e) {
-          console.warn(e);
         }
       }
 
-      function updateThumbMarker() {
-        if (!currentPage || !offscreenCanvas || thumbWidth === 0 || collapsed)
-          return;
-        const canvasW = canvas.width,
-          canvasH = canvas.height;
-        const imgW = offscreenCanvas.width,
-          imgH = offscreenCanvas.height;
-        let left = -offsetX,
-          top = -offsetY;
-        let right = left + canvasW,
-          bottom = top + canvasH;
-        const visLeft = Math.max(left, 0);
-        const visTop = Math.max(top, 0);
-        const visRight = Math.min(right, imgW);
-        const visBottom = Math.min(bottom, imgH);
-        if (visRight <= visLeft || visBottom <= visTop) {
-          viewportMarker.style.display = "none";
-          return;
-        }
-        // 使用缩略图画布的实际显示尺寸来计算标记位置
-        const thumbCanvasRect = thumbCanvas.getBoundingClientRect();
-        // 直接计算可见区域在缩略图中的比例位置
-        const markerLeft = (visLeft / imgW) * thumbCanvasRect.width;
-        const markerTop = (visTop / imgH) * thumbCanvasRect.height;
-        const markerW = ((visRight - visLeft) / imgW) * thumbCanvasRect.width;
-        const markerH = ((visBottom - visTop) / imgH) * thumbCanvasRect.height;
-        viewportMarker.style.left = `${markerLeft}px`;
-        viewportMarker.style.top = `${markerTop}px`;
-        viewportMarker.style.width = `${markerW}px`;
-        viewportMarker.style.height = `${markerH}px`;
-        viewportMarker.style.display = "block";
-      }
-
-      function onThumbClick(e) {
-        if (locked || collapsed) return;
-        if (!currentPage || !offscreenCanvas) return;
-        const rect = thumbInner.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        // 使用缩略图画布的实际显示尺寸来计算比例
-        const thumbCanvasRect = thumbCanvas.getBoundingClientRect();
-        const ratioX = clickX / thumbCanvasRect.width;
-        const ratioY = clickY / thumbCanvasRect.height;
-        const imgX = ratioX * offscreenCanvas.width;
-        const imgY = ratioY * offscreenCanvas.height;
-        offsetX = canvas.width / 2 - imgX;
-        offsetY = canvas.height / 2 - imgY;
-        updatePan();
-      }
-
+      // ==================== 缩略图 ====================
       // ==================== 锁定模式 ====================
       let wasFullscreenBeforeLock = false;
       let instructionTimeout;
@@ -1803,11 +1735,11 @@
       function updateButtonPositions() {
         const isMobile = window.innerWidth <= 640;
         if (!isMobile) {
-          // 电脑端：锁定按钮中心距离左边缘1/4屏幕宽度，导航按钮中心距离右边缘1/4屏幕宽度
+          // 电脑端：锁定按钮中心距离左边缘1/4屏幕宽度，语音按钮中心距离右边缘1/4屏幕宽度
           const lockBtnSize = lockBtnEl.offsetWidth || 66;
-          const thumbCardSize = thumbCard.offsetWidth || 66;
+          const voiceBtnSize = thumbCard.offsetWidth || 66;
           const leftPosition = window.innerWidth / 4 - lockBtnSize / 2;
-          const rightPosition = window.innerWidth / 4 - thumbCardSize / 2;
+          const rightPosition = window.innerWidth / 4 - voiceBtnSize / 2;
           lockBtnEl.style.left = `${Math.max(20, leftPosition)}px`;
           thumbCard.style.right = `${Math.max(20, rightPosition)}px`;
         } else {
@@ -1887,7 +1819,6 @@
           resizeCanvas();
           if (offscreenCanvas) {
             drawCanvas();
-            updateThumbMarker();
           }
         });
         resizeObserver.observe(canvasArea);
@@ -1896,7 +1827,6 @@
           updateButtonPositions();
           if (offscreenCanvas) {
             drawCanvas();
-            updateThumbMarker();
           }
         });
 
@@ -1931,82 +1861,6 @@
           }
         });
 
-        // 工具栏按钮 - 直接使用当前画布内容进行缩放，避免重新渲染
-        zoomInBtn.addEventListener("click", () => {
-          if (locked) return;
-          const targetScale = scale * 1.2;
-          const maxScale = 2000;
-          if (targetScale > maxScale) return;
-
-          // 保存当前画布内容
-          const tempCanvas = document.createElement("canvas");
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = canvas.height;
-          const tempCtx = tempCanvas.getContext("2d");
-          tempCtx.drawImage(canvas, 0, 0);
-
-          // 计算新的缩放比例和偏移量
-          const oldScale = scale;
-          const newScale = Math.min(maxScale, targetScale);
-          const scaleFactor = newScale / oldScale;
-          const centerX = canvas.width / 2;
-          const centerY = canvas.height / 2;
-          const newOffX = centerX - (centerX - offsetX) * scaleFactor;
-          const newOffY = centerY - (centerY - offsetY) * scaleFactor;
-
-          // 直接更新画布显示
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(
-            tempCanvas,
-            newOffX,
-            newOffY,
-            canvas.width * scaleFactor,
-            canvas.height * scaleFactor,
-          );
-
-          // 更新全局变量
-          scale = newScale;
-          offsetX = newOffX;
-          offsetY = newOffY;
-          updateScaleInput();
-        });
-
-        zoomOutBtn.addEventListener("click", () => {
-          if (locked) return;
-          const targetScale = scale * 0.833;
-
-          // 保存当前画布内容
-          const tempCanvas = document.createElement("canvas");
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = canvas.height;
-          const tempCtx = tempCanvas.getContext("2d");
-          tempCtx.drawImage(canvas, 0, 0);
-
-          // 计算新的缩放比例和偏移量
-          const oldScale = scale;
-          const newScale = Math.max(0.1, targetScale);
-          const scaleFactor = newScale / oldScale;
-          const centerX = canvas.width / 2;
-          const centerY = canvas.height / 2;
-          const newOffX = centerX - (centerX - offsetX) * scaleFactor;
-          const newOffY = centerY - (centerY - offsetY) * scaleFactor;
-
-          // 直接更新画布显示
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(
-            tempCanvas,
-            newOffX,
-            newOffY,
-            canvas.width * scaleFactor,
-            canvas.height * scaleFactor,
-          );
-
-          // 更新全局变量
-          scale = newScale;
-          offsetX = newOffX;
-          offsetY = newOffY;
-          updateScaleInput();
-        });
         scaleInput.addEventListener("change", () => {
           if (locked) return;
           let val = parseFloat(scaleInput.value);
@@ -2015,56 +1869,37 @@
           scaleAtPoint(val / 100, canvas.width / 2, canvas.height / 2);
         });
 
-        // 长按输入框，存储最佳比例
-        let longPressTimer;
-        let controlBar;
-        let controlBarValue = 0;
-        let isLongPressTriggered = false;
+        // 最佳比例按钮 - 双击保存最佳比例
+        let isBestScaleSaved = false; // 标记是否已保存最佳比例
 
-        scaleInput.addEventListener("touchstart", (e) => {
-          isLongPressTriggered = false;
-          startLongPress();
-        });
+        bestScaleBtn.addEventListener("dblclick", async () => {
+          if (locked) return;
 
-        scaleInput.addEventListener("mousedown", (e) => {
-          // 只有左键点击才触发长按
-          if (e.button !== 0) return;
-          isLongPressTriggered = false;
-          startLongPress();
-        });
+          isBestScaleSaved = true;
 
-        // 允许输入框获得焦点并输入
-        scaleInput.addEventListener("focus", () => {
-          // 清除长按定时器，避免干扰输入
-          cancelLongPress();
-        });
+          // 更新图标为红色实心
+          const icon = document.getElementById("bestScaleIcon");
+          if (icon) {
+            icon.style.stroke = "#ff4d4f";
+            icon.style.fill = "#ff4d4f";
+          }
 
-        function startLongPress() {
-          longPressTimer = setTimeout(async () => {
-            isLongPressTriggered = true;
-            // 存储当前比例为最佳比例到本地
-            localStorage.setItem("easyPdfBestScale", scale);
+          // 存储当前比例为最佳比例到本地
+          localStorage.setItem("easyPdfBestScale", scale);
 
-            // 如果用户已登录，同步到Supabase
-            if (isLoggedIn) {
-              try {
-                await syncBestScaleToSupabase(scale);
-                showToast("已存储最佳比例（已同步到云端）");
-              } catch (error) {
-                console.error("同步最佳比例失败:", error);
-                showToast("已存储最佳比例（仅本地）");
-              }
-            } else {
+          // 如果用户已登录，同步到Supabase
+          if (isLoggedIn) {
+            try {
+              await syncBestScaleToSupabase(scale);
+              showToast("已存储最佳比例（已同步到云端）");
+            } catch (error) {
+              console.error("同步最佳比例失败:", error);
               showToast("已存储最佳比例（仅本地）");
             }
-          }, 500); // 500ms 长按触发
-        }
-
-        function cancelLongPress() {
-          if (longPressTimer) {
-            clearTimeout(longPressTimer);
+          } else {
+            showToast("已存储最佳比例（仅本地）");
           }
-        }
+        });
 
         // 显示提示信息
         function showToast(message) {
@@ -2132,11 +1967,6 @@
 
           return null;
         }
-
-        scaleInput.addEventListener("touchend", cancelLongPress);
-        scaleInput.addEventListener("touchcancel", cancelLongPress);
-        scaleInput.addEventListener("mouseup", cancelLongPress);
-        scaleInput.addEventListener("mouseleave", cancelLongPress);
 
         function showControlBar() {
           // 移除已存在的控制条
@@ -2256,24 +2086,71 @@
         let isUsingBestScale = false;
         let isAnimating = false;
         resetBtn.addEventListener("click", async () => {
-          if (locked || isAnimating) return;
+          if (locked || isAnimating || !currentPage) return;
 
           isAnimating = true;
           const bestScale = localStorage.getItem("easyPdfBestScale");
+          const icon = document.getElementById("bestScaleIcon");
+
           if (bestScale) {
             if (isUsingBestScale) {
-              // 切换到全内容可看比例
+              // 切换到全内容可看比例（从红色实心到黑色空心）
               const targetScale = calculateResetScale();
-              await animateScale(targetScale, "已切换到全内容可看比例");
+              await animateScale(targetScale, (progress) => {
+                if (icon) {
+                  // 从红色实心渐变到黑色空心
+                  const r = Math.round(255 + (51 - 255) * progress);
+                  const g = Math.round(77 + (51 - 77) * progress);
+                  const b = Math.round(79 + (51 - 79) * progress);
+                  const fillOpacity = 1 - progress;
+                  icon.style.stroke = `rgb(${r}, ${g}, ${b})`;
+                  icon.style.fill = `rgba(255, 77, 79, ${fillOpacity})`;
+                }
+              });
+              // 确保最终状态为黑色空心
+              if (icon) {
+                icon.style.stroke = "#333333";
+                icon.style.fill = "none";
+              }
             } else {
-              // 切换到最佳比例
-              await animateScale(parseFloat(bestScale), "已切换到最佳比例");
+              // 切换到最佳比例（从黑色空心到红色实心）
+              await animateScale(parseFloat(bestScale), (progress) => {
+                if (icon) {
+                  // 从黑色空心渐变到红色实心
+                  const r = Math.round(51 + (255 - 51) * progress);
+                  const g = Math.round(51 + (77 - 51) * progress);
+                  const b = Math.round(51 + (79 - 51) * progress);
+                  const fillOpacity = progress;
+                  icon.style.stroke = `rgb(${r}, ${g}, ${b})`;
+                  icon.style.fill = `rgba(255, 77, 79, ${fillOpacity})`;
+                }
+              });
+              // 确保最终状态为红色实心
+              if (icon) {
+                icon.style.stroke = "#ff4d4f";
+                icon.style.fill = "#ff4d4f";
+              }
             }
             isUsingBestScale = !isUsingBestScale;
           } else {
-            // 没有最佳比例，显示全内容可看比例
+            // 没有最佳比例，显示全内容可看比例（从红色实心到黑色空心）
             const targetScale = calculateResetScale();
-            await animateScale(targetScale, "已重置到全内容可看比例");
+            await animateScale(targetScale, (progress) => {
+              if (icon) {
+                // 从红色实心渐变到黑色空心
+                const r = Math.round(255 + (51 - 255) * progress);
+                const g = Math.round(77 + (51 - 77) * progress);
+                const b = Math.round(79 + (51 - 79) * progress);
+                const fillOpacity = 1 - progress;
+                icon.style.stroke = `rgb(${r}, ${g}, ${b})`;
+                icon.style.fill = `rgba(255, 77, 79, ${fillOpacity})`;
+              }
+            });
+            // 确保最终状态为黑色空心
+            if (icon) {
+              icon.style.stroke = "#333333";
+              icon.style.fill = "none";
+            }
           }
           isAnimating = false;
         });
@@ -2296,7 +2173,7 @@
         }
 
         // 平滑缩放动画
-        async function animateScale(targetScale, toastMessage) {
+        async function animateScale(targetScale, onProgress) {
           const startScale = scale;
           const startOffsetX = offsetX;
           const startOffsetY = offsetY;
@@ -2353,8 +2230,13 @@
                 }
               }
 
-              // 更新缩放输入框
-              updateScaleInput();
+              // 更新缩放输入框（使用当前动画比例，不触发渲染）
+              scaleInput.value = (currentScale * 100).toFixed(1);
+
+              // 调用进度回调函数
+              if (onProgress) {
+                onProgress(easeProgress);
+              }
 
               if (progress < 1) {
                 requestAnimationFrame(animate);
@@ -2401,8 +2283,6 @@
                 // 使用 setTimeout 让出主线程，避免阻塞UI
                 setTimeout(() => {
                   refreshRender().then(() => {
-                    updateThumbMarker();
-                    showToast(toastMessage);
                     resolve();
                   });
                 }, 0);
@@ -2431,18 +2311,57 @@
         // 锁定按钮
         lockBtnEl.addEventListener("click", toggleLock);
 
-        // 缩略图
-        pinToggle.addEventListener("click", () => {
+        // 语音按钮
+        thumbCard.addEventListener("mousedown", () => {
           if (locked) return;
-          collapsed = !collapsed;
-          if (collapsed) {
-            thumbCard.classList.add("collapsed");
-          } else {
-            thumbCard.classList.remove("collapsed");
-            generateThumbnail();
+          // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
+          thumbCard.style.background = "#333333";
+          const icon = thumbCard.querySelector("img");
+          if (icon) {
+            icon.style.filter = "brightness(0) invert(1)";
           }
         });
-        thumbInner.addEventListener("click", onThumbClick);
+
+        thumbCard.addEventListener("mouseup", () => {
+          if (locked) return;
+          // 长按结束：平滑过渡到原始状态
+          thumbCard.style.background = "#c3c3c3";
+          const icon = thumbCard.querySelector("img");
+          if (icon) {
+            icon.style.filter = "none";
+          }
+        });
+
+        thumbCard.addEventListener("mouseleave", () => {
+          if (locked) return;
+          // 鼠标离开：恢复原始状态
+          thumbCard.style.background = "#c3c3c3";
+          const icon = thumbCard.querySelector("img");
+          if (icon) {
+            icon.style.filter = "none";
+          }
+        });
+
+        // 触摸设备支持
+        thumbCard.addEventListener("touchstart", () => {
+          if (locked) return;
+          // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
+          thumbCard.style.background = "#333333";
+          const icon = thumbCard.querySelector("img");
+          if (icon) {
+            icon.style.filter = "brightness(0) invert(1)";
+          }
+        });
+
+        thumbCard.addEventListener("touchend", () => {
+          if (locked) return;
+          // 长按结束：平滑过渡到原始状态
+          thumbCard.style.background = "#c3c3c3";
+          const icon = thumbCard.querySelector("img");
+          if (icon) {
+            icon.style.filter = "none";
+          }
+        });
 
         // 初始显示
         resizeCanvas();
