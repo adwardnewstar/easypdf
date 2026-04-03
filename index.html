@@ -82,7 +82,7 @@
         top: 0;
         left: 0;
         width: 100%;
-        background: rgba(30, 30, 38, 0.1);
+        background: rgba(30, 30, 38, 0.25);
         backdrop-filter: blur(12px);
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 200;
@@ -90,6 +90,9 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        /* 强制硬件加速，减少残影 */
+        transform: translateZ(0);
+        will-change: transform;
       }
 
       .toolbar-group {
@@ -107,16 +110,20 @@
         min-height: 44px;
         border-radius: 9999px;
         background: #c3c3c3;
-        backdrop-filter: blur(4px);
         border: 1px solid rgba(255, 255, 255, 0.2);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
         font-size: 20px;
         color: white;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        /* 强制硬件加速，减少残影 */
+        transform: translateZ(0);
+        will-change: transform;
       }
       .circle-btn:active {
         transform: scale(0.94);
@@ -163,8 +170,7 @@
       }
 
       .scale-input {
-        background: rgba(20, 20, 28, 0.6);
-        backdrop-filter: blur(4px);
+        background: rgba(20, 20, 28, 0.75);
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 9999px;
         padding: 0 3vh;
@@ -185,6 +191,9 @@
         /* 允许文本选择，以便输入 */
         user-select: text;
         -webkit-user-select: text;
+        /* 强制硬件加速，减少残影 */
+        transform: translateZ(0);
+        will-change: transform;
       }
       .scale-input::-webkit-outer-spin-button,
       .scale-input::-webkit-inner-spin-button {
@@ -930,18 +939,38 @@
       // 检查用户登录状态
       async function checkAuthStatus() {
         try {
+          // 添加超时机制，避免网络请求阻塞
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+
           const {
             data: { user },
-          } = await supabaseClient.auth.getUser();
+          } = await supabaseClient.auth.getUser({
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          isLoggedIn = !!user;
+          // 缓存认证状态到本地
+          localStorage.setItem("easyPdfAuth", JSON.stringify(isLoggedIn));
+
           if (user) {
-            isLoggedIn = true;
             // 登录后同步最佳比例
-            await loadBestScaleFromSupabase();
+            loadBestScaleFromSupabase();
             // 登录后清理历史记录，确保只保留5个文件
-            await limitStorageFiles();
+            limitStorageFiles();
           }
         } catch (err) {
           console.error("检查登录状态失败", err);
+          // 出错时使用缓存的状态
+          const cachedAuth = localStorage.getItem("easyPdfAuth");
+          if (cachedAuth) {
+            isLoggedIn = JSON.parse(cachedAuth);
+          } else {
+            isLoggedIn = false;
+            localStorage.setItem("easyPdfAuth", "false");
+          }
         }
       }
 
@@ -1789,8 +1818,17 @@
       }
 
       async function init() {
-        // 检查登录状态，如果已登录则保持登录状态
-        await checkAuthStatus();
+        // 优先使用本地缓存的认证状态
+        const cachedAuth = localStorage.getItem("easyPdfAuth");
+        if (cachedAuth) {
+          isLoggedIn = JSON.parse(cachedAuth);
+        }
+
+        // 异步检查认证状态，不阻塞页面初始化
+        checkAuthStatus().then(() => {
+          // 认证检查完成后加载历史记录
+          loadHistory();
+        });
 
         // 初始化按钮位置
         updateButtonPositions();
@@ -1893,14 +1931,81 @@
           }
         });
 
-        // 工具栏按钮
+        // 工具栏按钮 - 直接使用当前画布内容进行缩放，避免重新渲染
         zoomInBtn.addEventListener("click", () => {
           if (locked) return;
-          scaleAtPoint(scale * 1.2, canvas.width / 2, canvas.height / 2);
+          const targetScale = scale * 1.2;
+          const maxScale = 2000;
+          if (targetScale > maxScale) return;
+
+          // 保存当前画布内容
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const tempCtx = tempCanvas.getContext("2d");
+          tempCtx.drawImage(canvas, 0, 0);
+
+          // 计算新的缩放比例和偏移量
+          const oldScale = scale;
+          const newScale = Math.min(maxScale, targetScale);
+          const scaleFactor = newScale / oldScale;
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const newOffX = centerX - (centerX - offsetX) * scaleFactor;
+          const newOffY = centerY - (centerY - offsetY) * scaleFactor;
+
+          // 直接更新画布显示
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(
+            tempCanvas,
+            newOffX,
+            newOffY,
+            canvas.width * scaleFactor,
+            canvas.height * scaleFactor,
+          );
+
+          // 更新全局变量
+          scale = newScale;
+          offsetX = newOffX;
+          offsetY = newOffY;
+          updateScaleInput();
         });
+
         zoomOutBtn.addEventListener("click", () => {
           if (locked) return;
-          scaleAtPoint(scale * 0.833, canvas.width / 2, canvas.height / 2);
+          const targetScale = scale * 0.833;
+
+          // 保存当前画布内容
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const tempCtx = tempCanvas.getContext("2d");
+          tempCtx.drawImage(canvas, 0, 0);
+
+          // 计算新的缩放比例和偏移量
+          const oldScale = scale;
+          const newScale = Math.max(0.1, targetScale);
+          const scaleFactor = newScale / oldScale;
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const newOffX = centerX - (centerX - offsetX) * scaleFactor;
+          const newOffY = centerY - (centerY - offsetY) * scaleFactor;
+
+          // 直接更新画布显示
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(
+            tempCanvas,
+            newOffX,
+            newOffY,
+            canvas.width * scaleFactor,
+            canvas.height * scaleFactor,
+          );
+
+          // 更新全局变量
+          scale = newScale;
+          offsetX = newOffX;
+          offsetY = newOffY;
+          updateScaleInput();
         });
         scaleInput.addEventListener("change", () => {
           if (locked) return;
@@ -2138,63 +2243,10 @@
             document.removeEventListener("click", closeControlBar);
           }
         }
-        // 为所有按钮添加长按重新载入功能
-        const buttons = [
-          fileBtn,
-          zoomOutBtn,
-          zoomInBtn,
-          historyBtn,
-          fullscreenBtn,
-          resetBtn,
-        ];
-        buttons.forEach((btn) => {
-          let longPressTimer = null;
-          let isLongPress = false;
-          let isMouseDown = false;
 
-          btn.addEventListener("mousedown", (e) => {
-            isMouseDown = true;
-            isLongPress = false;
-            longPressTimer = setTimeout(() => {
-              isLongPress = true;
-              location.reload();
-            }, 1000);
-          });
-          btn.addEventListener("mouseup", () => {
-            isMouseDown = false;
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-          });
-          btn.addEventListener("mouseleave", () => {
-            isMouseDown = false;
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-          });
-          btn.addEventListener("touchstart", (e) => {
-            isMouseDown = true;
-            isLongPress = false;
-            longPressTimer = setTimeout(() => {
-              isLongPress = true;
-              location.reload();
-            }, 1000);
-          });
-          btn.addEventListener("touchend", () => {
-            isMouseDown = false;
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-          });
-
-          // 为historyBtn添加点击事件处理
-          if (btn === historyBtn) {
-            btn.addEventListener("click", (e) => {
-              // 只有在不是长按且鼠标/手指已经抬起时才执行
-              if (isLongPress || isMouseDown) {
-                e.stopPropagation();
-                return;
-              }
-              toggleHistoryMenu();
-            });
-          }
+        // 为historyBtn添加点击事件处理
+        historyBtn.addEventListener("click", (e) => {
+          toggleHistoryMenu();
         });
         fullscreenBtn.addEventListener("click", () => {
           if (locked) return;
@@ -2251,12 +2303,10 @@
           const duration = 600; // 动画持续时间600ms
           const startTime = performance.now();
 
-          // 保存起始状态的渲染结果
-          const startCanvas = document.createElement("canvas");
-          startCanvas.width = canvas.width;
-          startCanvas.height = canvas.height;
-          const startCtx = startCanvas.getContext("2d");
-          startCtx.drawImage(canvas, 0, 0);
+          // 确保有完整的离屏渲染结果
+          if (!offscreenCanvas) {
+            await refreshRender();
+          }
 
           return new Promise((resolve) => {
             function animate(currentTime) {
@@ -2267,29 +2317,41 @@
               const easeProgress = 1 - Math.pow(1 - progress, 3);
 
               // 计算当前缩放比例
-              const currentScaleRatio =
+              const currentScale =
                 startScale + (targetScale - startScale) * easeProgress;
-              const scaleFactor = currentScaleRatio / startScale;
 
               // 清除画布
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              // 计算缩放后的尺寸和位置（以屏幕中心为锚点）
+              // 计算当前偏移量（基于完整PDF页面）
               const centerX = canvas.width / 2;
               const centerY = canvas.height / 2;
-              const scaledWidth = startCanvas.width * scaleFactor;
-              const scaledHeight = startCanvas.height * scaleFactor;
-              const drawX = centerX - scaledWidth / 2;
-              const drawY = centerY - scaledHeight / 2;
 
-              // 绘制缩放后的起始渲染结果
-              ctx.drawImage(
-                startCanvas,
-                drawX,
-                drawY,
-                scaledWidth,
-                scaledHeight,
-              );
+              // 使用完整的离屏渲染结果绘制
+              if (offscreenCanvas && currentPage) {
+                try {
+                  // 计算当前缩放因子
+                  const currentRenderScale = currentScale * dpr;
+                  const viewport = currentPage.getViewport({ scale: 1 });
+                  const fullWidth = viewport.width * currentRenderScale;
+                  const fullHeight = viewport.height * currentRenderScale;
+
+                  // 计算绘制位置（以屏幕中心为锚点）
+                  const drawX = centerX - fullWidth / 2;
+                  const drawY = centerY - fullHeight / 2;
+
+                  // 绘制完整的缩放后的内容
+                  ctx.drawImage(
+                    offscreenCanvas,
+                    drawX,
+                    drawY,
+                    fullWidth,
+                    fullHeight,
+                  );
+                } catch (e) {
+                  console.error("动画渲染失败", e);
+                }
+              }
 
               // 更新缩放输入框
               updateScaleInput();
