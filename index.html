@@ -878,6 +878,11 @@
       let currentFileName = null;
       let currentArrayBuffer = null; // 内存缓存，用于重置
       let currentStoragePath = null; // 当前文件在Supabase中的存储路径（若有）
+
+      // 暂存渲染结果
+      let fullContentRender = null; // 全屏显示比例的渲染结果
+      let bestScaleRender = null; // 最佳比例的渲染结果
+
       let cachedHistoryList = []; // 缓存的历史记录列表
 
       // 交互状态
@@ -896,6 +901,20 @@
         touchStartOffsetY = 0;
 
       let isRendering = false;
+
+      // 初始化最佳比例按钮状态
+      function initBestScaleButton() {
+        const icon = document.getElementById("bestScaleIcon");
+        if (icon) {
+          // 未载入文件时，默认显示黑色空心爱心
+          icon.style.stroke = "#333333";
+          icon.style.fill = "none";
+          isUsingBestScale = false;
+        }
+      }
+
+      // 页面加载时初始化
+      initBestScaleButton();
 
       // ==================== 辅助函数 ====================
       function showLoading(show, msg = "加载中...") {
@@ -1195,19 +1214,82 @@
         const imgH = viewport.height * dpr;
         let newScale = Math.min(canvasW / imgW, canvasH / imgH);
         newScale = Math.min(8, newScale);
+
+        // 创建临时离屏画布用于计算和暂存渲染结果
+        const tempOffscreenCanvas = document.createElement("canvas");
+        const tempOffCtx = tempOffscreenCanvas.getContext("2d");
+
+        // 渲染全内容显示比例
+        const fullContentViewport = currentPage.getViewport({
+          scale: newScale * dpr,
+        });
+        tempOffscreenCanvas.width = fullContentViewport.width;
+        tempOffscreenCanvas.height = fullContentViewport.height;
+        await currentPage.render({
+          canvasContext: tempOffCtx,
+          viewport: fullContentViewport,
+          background: "white",
+        }).promise;
+        // 暂存全内容显示比例的渲染结果
+        fullContentRender = document.createElement("canvas");
+        fullContentRender.width = tempOffscreenCanvas.width;
+        fullContentRender.height = tempOffscreenCanvas.height;
+        const fullCtx = fullContentRender.getContext("2d");
+        fullCtx.drawImage(tempOffscreenCanvas, 0, 0);
+
+        // 计算并暂存最佳比例的渲染结果
+        const bestScale = localStorage.getItem("easyPdfBestScale");
+        if (bestScale) {
+          const savedBestScale = parseFloat(bestScale);
+          // 渲染最佳比例
+          const bestScaleViewport = currentPage.getViewport({
+            scale: savedBestScale * dpr,
+          });
+          tempOffscreenCanvas.width = bestScaleViewport.width;
+          tempOffscreenCanvas.height = bestScaleViewport.height;
+          await currentPage.render({
+            canvasContext: tempOffCtx,
+            viewport: bestScaleViewport,
+            background: "white",
+          }).promise;
+          // 暂存最佳比例的渲染结果
+          bestScaleRender = document.createElement("canvas");
+          bestScaleRender.width = tempOffscreenCanvas.width;
+          bestScaleRender.height = tempOffscreenCanvas.height;
+          const bestCtx = bestScaleRender.getContext("2d");
+          bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+        } else {
+          // 没有最佳比例，计算默认最佳比例（全内容可看比例的2倍）
+          const defaultBestScale = newScale * 2;
+          localStorage.setItem("easyPdfBestScale", defaultBestScale.toString());
+          // 渲染默认最佳比例
+          const defaultBestScaleViewport = currentPage.getViewport({
+            scale: defaultBestScale * dpr,
+          });
+          tempOffscreenCanvas.width = defaultBestScaleViewport.width;
+          tempOffscreenCanvas.height = defaultBestScaleViewport.height;
+          await currentPage.render({
+            canvasContext: tempOffCtx,
+            viewport: defaultBestScaleViewport,
+            background: "white",
+          }).promise;
+          // 暂存默认最佳比例的渲染结果
+          bestScaleRender = document.createElement("canvas");
+          bestScaleRender.width = tempOffscreenCanvas.width;
+          bestScaleRender.height = tempOffscreenCanvas.height;
+          const bestCtx = bestScaleRender.getContext("2d");
+          bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+        }
+
+        // 设置为全内容显示比例
         scale = newScale;
-        // 让出主线程，避免阻塞UI
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        // 计算居中偏移量
+        const viewportWidth = viewport.width * newScale * dpr;
+        const viewportHeight = viewport.height * newScale * dpr;
+        offsetX = (canvas.width - viewportWidth) / 2;
+        offsetY = (canvas.height - viewportHeight) / 2;
         // 等待渲染完成
         await refreshRender();
-        // 重新获取渲染后的尺寸并居中
-        const newW = offscreenCanvas.width;
-        const newH = offscreenCanvas.height;
-        offsetX = (canvas.width - newW) / 2;
-        offsetY = (canvas.height - newH) / 2;
-        // 确保画布更新
-        drawCanvas();
-        updateScaleInput();
         // 检查最佳比例状态
         checkBestScaleStatus();
       }
@@ -1241,6 +1323,13 @@
           if (pdfDoc) pdfDoc.destroy?.();
           currentPage = null;
           offscreenCanvas = null;
+
+          // 清除暂存的渲染结果
+          fullContentRender = null;
+          bestScaleRender = null;
+
+          // 重置最佳比例按钮状态
+          initBestScaleButton();
 
           // 使用 setTimeout 将PDF加载操作分解，避免阻塞主线程
           await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1587,7 +1676,7 @@
       function checkBestScaleStatus() {
         const bestScale = localStorage.getItem("easyPdfBestScale");
         const icon = document.getElementById("bestScaleIcon");
-        if (!bestScale || !icon) return;
+        if (!bestScale || !icon || !currentPage) return;
 
         const currentScale = scale;
         const savedScale = parseFloat(bestScale);
@@ -2020,6 +2109,28 @@
           // 存储当前比例为最佳比例到本地
           localStorage.setItem("easyPdfBestScale", scale);
 
+          // 重新计算并更新最佳比例的暂存渲染结果
+          if (currentPage && offscreenCanvas) {
+            const bestScaleViewport = currentPage.getViewport({
+              scale: scale * dpr,
+            });
+            const tempOffscreenCanvas = document.createElement("canvas");
+            tempOffscreenCanvas.width = bestScaleViewport.width;
+            tempOffscreenCanvas.height = bestScaleViewport.height;
+            const tempOffCtx = tempOffscreenCanvas.getContext("2d");
+            await currentPage.render({
+              canvasContext: tempOffCtx,
+              viewport: bestScaleViewport,
+              background: "white",
+            }).promise;
+            // 更新最佳比例的暂存渲染结果
+            bestScaleRender = document.createElement("canvas");
+            bestScaleRender.width = tempOffscreenCanvas.width;
+            bestScaleRender.height = tempOffscreenCanvas.height;
+            const bestCtx = bestScaleRender.getContext("2d");
+            bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+          }
+
           // 如果用户已登录，同步到Supabase
           if (isLoggedIn) {
             try {
@@ -2242,11 +2353,21 @@
           const bestScale = localStorage.getItem("easyPdfBestScale");
           const icon = document.getElementById("bestScaleIcon");
 
+          // 计算全内容可看比例
+          const contentVisibleScale = calculateResetScale();
+
+          // 检查当前是否处于非最佳比例且非全内容可见比例状态
+          const isContentVisibleScale =
+            Math.abs(scale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
+
           if (bestScale) {
-            if (isUsingBestScale) {
+            const savedBestScale = parseFloat(bestScale);
+            const isCurrentBestScale =
+              Math.abs(scale - savedBestScale) < BEST_SCALE_THRESHOLD;
+
+            if (isCurrentBestScale) {
               // 切换到全内容可看比例（从红色实心到黑色空心）
-              const targetScale = calculateResetScale();
-              await animateScale(targetScale, (progress) => {
+              await animateScale(contentVisibleScale, (progress) => {
                 if (icon) {
                   // 从红色实心渐变到黑色空心
                   const r = Math.round(255 + (51 - 255) * progress);
@@ -2262,9 +2383,10 @@
                 icon.style.stroke = "#333333";
                 icon.style.fill = "none";
               }
-            } else {
+              isUsingBestScale = false;
+            } else if (isContentVisibleScale) {
               // 切换到最佳比例（从黑色空心到红色实心）
-              await animateScale(parseFloat(bestScale), (progress) => {
+              await animateScale(savedBestScale, (progress) => {
                 if (icon) {
                   // 从黑色空心渐变到红色实心
                   const r = Math.round(51 + (255 - 51) * progress);
@@ -2280,27 +2402,53 @@
                 icon.style.stroke = "#ff4d4f";
                 icon.style.fill = "#ff4d4f";
               }
-            }
-            isUsingBestScale = !isUsingBestScale;
-          } else {
-            // 没有最佳比例，显示全内容可看比例（从红色实心到黑色空心）
-            const targetScale = calculateResetScale();
-            await animateScale(targetScale, (progress) => {
+              isUsingBestScale = true;
+            } else {
+              // 当前处于非最佳比例且非全内容可见比例，切换到最佳比例
+              await animateScale(savedBestScale, (progress) => {
+                if (icon) {
+                  // 从黑色空心渐变到红色实心
+                  const r = Math.round(51 + (255 - 51) * progress);
+                  const g = Math.round(51 + (77 - 51) * progress);
+                  const b = Math.round(51 + (79 - 51) * progress);
+                  const fillOpacity = progress;
+                  icon.style.stroke = `rgb(${r}, ${g}, ${b})`;
+                  icon.style.fill = `rgba(255, 77, 79, ${fillOpacity})`;
+                }
+              });
+              // 确保最终状态为红色实心
               if (icon) {
-                // 从红色实心渐变到黑色空心
-                const r = Math.round(255 + (51 - 255) * progress);
-                const g = Math.round(77 + (51 - 77) * progress);
-                const b = Math.round(79 + (51 - 79) * progress);
-                const fillOpacity = 1 - progress;
+                icon.style.stroke = "#ff4d4f";
+                icon.style.fill = "#ff4d4f";
+              }
+              isUsingBestScale = true;
+            }
+          } else {
+            // 没有最佳比例，计算默认最佳比例（全内容可看比例的2倍）
+            const defaultBestScale = contentVisibleScale * 2;
+            localStorage.setItem(
+              "easyPdfBestScale",
+              defaultBestScale.toString(),
+            );
+
+            // 切换到默认最佳比例（从黑色空心到红色实心）
+            await animateScale(defaultBestScale, (progress) => {
+              if (icon) {
+                // 从黑色空心渐变到红色实心
+                const r = Math.round(51 + (255 - 51) * progress);
+                const g = Math.round(51 + (77 - 51) * progress);
+                const b = Math.round(51 + (79 - 51) * progress);
+                const fillOpacity = progress;
                 icon.style.stroke = `rgb(${r}, ${g}, ${b})`;
                 icon.style.fill = `rgba(255, 77, 79, ${fillOpacity})`;
               }
             });
-            // 确保最终状态为黑色空心
+            // 确保最终状态为红色实心
             if (icon) {
-              icon.style.stroke = "#333333";
-              icon.style.fill = "none";
+              icon.style.stroke = "#ff4d4f";
+              icon.style.fill = "#ff4d4f";
             }
+            isUsingBestScale = true;
           }
           isAnimating = false;
         });
@@ -2327,7 +2475,21 @@
           const startScale = scale;
           const startOffsetX = offsetX;
           const startOffsetY = offsetY;
-          const duration = 600; // 动画持续时间600ms
+
+          // 根据缩放倍数动态计算动画时间
+          const scaleRatio = Math.abs(targetScale / startScale);
+          const scaleFactor = Math.log(scaleRatio) / Math.log(2); // 使用对数来计算缩放的"倍数"
+          const baseDuration = 300; // 基础动画时间
+          const maxDuration = 800; // 最大动画时间
+          const minDuration = 200; // 最小动画时间
+
+          // 计算动画时间：小幅度缩放时间短，大幅度缩放时间长
+          let duration = baseDuration + Math.abs(scaleFactor) * 50;
+          duration = Math.max(minDuration, Math.min(maxDuration, duration));
+
+          // 统一放大两倍
+          duration *= 2;
+
           const startTime = performance.now();
 
           // 确保有完整的离屏渲染结果
@@ -2335,12 +2497,40 @@
             await refreshRender();
           }
 
+          // 确定动画类型
+          let animationType = "normal";
+          const contentVisibleScale = calculateResetScale();
+          const isStartFullContent =
+            Math.abs(startScale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
+          const isTargetFullContent =
+            Math.abs(targetScale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
+          const bestScale = localStorage.getItem("easyPdfBestScale");
+          const savedBestScale = bestScale
+            ? parseFloat(bestScale)
+            : contentVisibleScale * 2;
+          const isStartBestScale =
+            Math.abs(startScale - savedBestScale) < BEST_SCALE_THRESHOLD;
+          const isTargetBestScale =
+            Math.abs(targetScale - savedBestScale) < BEST_SCALE_THRESHOLD;
+
+          if (isStartFullContent && isTargetBestScale) {
+            animationType = "fullToBest";
+          } else if (isStartBestScale && isTargetFullContent) {
+            animationType = "bestToFull";
+          } else if (
+            !isStartBestScale &&
+            !isStartFullContent &&
+            isTargetBestScale
+          ) {
+            animationType = "anyToBest";
+          }
+
           return new Promise((resolve) => {
             function animate(currentTime) {
               const elapsed = currentTime - startTime;
               const progress = Math.min(elapsed / duration, 1);
 
-              // 使用easeOutCubic缓动函数
+              // 使用easeOutCubic缓动函数，使动画先快后慢
               const easeProgress = 1 - Math.pow(1 - progress, 3);
 
               // 计算当前缩放比例
@@ -2354,29 +2544,169 @@
               const centerX = canvas.width / 2;
               const centerY = canvas.height / 2;
 
-              // 使用完整的离屏渲染结果绘制
-              if (offscreenCanvas && currentPage) {
-                try {
-                  // 计算当前缩放因子
-                  const currentRenderScale = currentScale * dpr;
-                  const viewport = currentPage.getViewport({ scale: 1 });
-                  const fullWidth = viewport.width * currentRenderScale;
-                  const fullHeight = viewport.height * currentRenderScale;
+              // 使用不同的渲染策略
+              if (animationType === "fullToBest") {
+                // 当由全屏显示比例到最佳比例，由全屏显示比例放大后最后一帧切换为最佳比例
+                if (progress < 1) {
+                  // 动画过程中使用全内容显示的渲染结果放大
+                  if (fullContentRender) {
+                    try {
+                      const currentRenderScale =
+                        currentScale / contentVisibleScale;
+                      const fullWidth =
+                        fullContentRender.width * currentRenderScale;
+                      const fullHeight =
+                        fullContentRender.height * currentRenderScale;
 
-                  // 计算绘制位置（以屏幕中心为锚点）
-                  const drawX = centerX - fullWidth / 2;
-                  const drawY = centerY - fullHeight / 2;
+                      // 计算绘制位置（以屏幕中心为锚点）
+                      const drawX = centerX - fullWidth / 2;
+                      const drawY = centerY - fullHeight / 2;
 
-                  // 绘制完整的缩放后的内容
-                  ctx.drawImage(
-                    offscreenCanvas,
-                    drawX,
-                    drawY,
-                    fullWidth,
-                    fullHeight,
-                  );
-                } catch (e) {
-                  console.error("动画渲染失败", e);
+                      // 绘制缩放后的内容
+                      ctx.drawImage(
+                        fullContentRender,
+                        drawX,
+                        drawY,
+                        fullWidth,
+                        fullHeight,
+                      );
+                    } catch (e) {
+                      console.error("动画渲染失败", e);
+                    }
+                  }
+                } else {
+                  // 最后一帧切换为最佳比例渲染结果
+                  if (bestScaleRender) {
+                    try {
+                      const bestWidth = bestScaleRender.width;
+                      const bestHeight = bestScaleRender.height;
+
+                      // 计算绘制位置（以屏幕中心为锚点）
+                      const drawX = centerX - bestWidth / 2;
+                      const drawY = centerY - bestHeight / 2;
+
+                      // 绘制最佳比例的内容
+                      ctx.drawImage(
+                        bestScaleRender,
+                        drawX,
+                        drawY,
+                        bestWidth,
+                        bestHeight,
+                      );
+                    } catch (e) {
+                      console.error("动画渲染失败", e);
+                    }
+                  }
+                }
+              } else if (animationType === "bestToFull") {
+                // 当由最佳比例到全屏显示比例，第一帧变为全屏显示放大结果，开始缩小至全屏显示
+                if (progress > 0) {
+                  // 动画过程中使用全内容显示的渲染结果放大后缩小
+                  if (fullContentRender) {
+                    try {
+                      const currentRenderScale =
+                        currentScale / contentVisibleScale;
+                      const fullWidth =
+                        fullContentRender.width * currentRenderScale;
+                      const fullHeight =
+                        fullContentRender.height * currentRenderScale;
+
+                      // 计算绘制位置（以屏幕中心为锚点）
+                      const drawX = centerX - fullWidth / 2;
+                      const drawY = centerY - fullHeight / 2;
+
+                      // 绘制缩放后的内容
+                      ctx.drawImage(
+                        fullContentRender,
+                        drawX,
+                        drawY,
+                        fullWidth,
+                        fullHeight,
+                      );
+                    } catch (e) {
+                      console.error("动画渲染失败", e);
+                    }
+                  }
+                }
+              } else if (animationType === "anyToBest") {
+                // 当由任意比例到最佳比例，第一帧为全屏显示放大结果（放大结果相对位置与原比例保持一致），开始缩放至最佳比例，最后一帧切换为最佳比例
+                if (progress < 1) {
+                  // 动画过程中使用全内容显示的渲染结果放大
+                  if (fullContentRender) {
+                    try {
+                      const currentRenderScale =
+                        currentScale / contentVisibleScale;
+                      const fullWidth =
+                        fullContentRender.width * currentRenderScale;
+                      const fullHeight =
+                        fullContentRender.height * currentRenderScale;
+
+                      // 计算绘制位置（以屏幕中心为锚点）
+                      const drawX = centerX - fullWidth / 2;
+                      const drawY = centerY - fullHeight / 2;
+
+                      // 绘制缩放后的内容
+                      ctx.drawImage(
+                        fullContentRender,
+                        drawX,
+                        drawY,
+                        fullWidth,
+                        fullHeight,
+                      );
+                    } catch (e) {
+                      console.error("动画渲染失败", e);
+                    }
+                  }
+                } else {
+                  // 最后一帧切换为最佳比例渲染结果
+                  if (bestScaleRender) {
+                    try {
+                      const bestWidth = bestScaleRender.width;
+                      const bestHeight = bestScaleRender.height;
+
+                      // 计算绘制位置（以屏幕中心为锚点）
+                      const drawX = centerX - bestWidth / 2;
+                      const drawY = centerY - bestHeight / 2;
+
+                      // 绘制最佳比例的内容
+                      ctx.drawImage(
+                        bestScaleRender,
+                        drawX,
+                        drawY,
+                        bestWidth,
+                        bestHeight,
+                      );
+                    } catch (e) {
+                      console.error("动画渲染失败", e);
+                    }
+                  }
+                }
+              } else {
+                // 其他情况，使用默认渲染方式
+                // 使用完整的离屏渲染结果绘制
+                if (offscreenCanvas && currentPage) {
+                  try {
+                    // 计算当前缩放因子
+                    const currentRenderScale = currentScale * dpr;
+                    const viewport = currentPage.getViewport({ scale: 1 });
+                    const fullWidth = viewport.width * currentRenderScale;
+                    const fullHeight = viewport.height * currentRenderScale;
+
+                    // 计算绘制位置（以屏幕中心为锚点）
+                    const drawX = centerX - fullWidth / 2;
+                    const drawY = centerY - fullHeight / 2;
+
+                    // 绘制完整的缩放后的内容
+                    ctx.drawImage(
+                      offscreenCanvas,
+                      drawX,
+                      drawY,
+                      fullWidth,
+                      fullHeight,
+                    );
+                  } catch (e) {
+                    console.error("动画渲染失败", e);
+                  }
                 }
               }
 
