@@ -140,12 +140,14 @@
         image-rendering: crisp-edges;
         display: block;
         transition: filter 0.3s ease;
+        pointer-events: none; /* 点击事件穿透 */
       }
       /* 最佳比例按钮图标样式 */
       #bestScaleIcon {
         stroke: #333333; /* 黑色描边 */
         fill: none; /* 空心 */
         transition: all 0.3s ease;
+        pointer-events: none; /* 点击事件穿透 */
       }
       .fixed-btn-icon {
         width: 50%;
@@ -157,6 +159,7 @@
         image-rendering: crisp-edges;
         display: block;
         transition: filter 0.3s ease;
+        pointer-events: none; /* 点击事件穿透 */
       }
       .pin-icon {
         width: 2vw;
@@ -189,9 +192,11 @@
         appearance: none;
         -webkit-appearance: none;
         -moz-appearance: textfield;
-        /* 允许文本选择，以便输入 */
-        user-select: text;
-        -webkit-user-select: text;
+        /* 禁止文本选择 */
+        user-select: none;
+        -webkit-user-select: none;
+        /* 禁止指针事件 */
+        pointer-events: none;
         /* 强制硬件加速，减少残影 */
         transform: translateZ(0);
         will-change: transform;
@@ -635,6 +640,12 @@
         align-items: center;
         z-index: 1000;
         display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .login-overlay.show {
+        display: flex;
+        opacity: 1;
       }
       .login-form {
         background: #c2c2c2;
@@ -652,6 +663,11 @@
         flex-direction: column;
         justify-content: center;
         gap: 2vh;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+      .login-overlay.show .login-form {
+        transform: scale(1);
       }
       .login-title {
         color: #333333;
@@ -853,6 +869,7 @@
       let dpr = window.devicePixelRatio || 1;
 
       let locked = false; // 锁定模式
+      let isUsingBestScale = false; // 是否使用最佳比例
 
       // 登录状态
       let isLoggedIn = false;
@@ -891,6 +908,22 @@
       }
 
       // 登录相关函数
+      function showLoginOverlay() {
+        const loginOverlay = document.getElementById("loginOverlay");
+        loginOverlay.style.display = "flex";
+        setTimeout(() => {
+          loginOverlay.classList.add("show");
+        }, 10);
+      }
+
+      function hideLoginOverlay() {
+        const loginOverlay = document.getElementById("loginOverlay");
+        loginOverlay.classList.remove("show");
+        setTimeout(() => {
+          loginOverlay.style.display = "none";
+        }, 300);
+      }
+
       async function login(email, password) {
         const loginError = document.getElementById("loginError");
         loginError.textContent = "";
@@ -907,7 +940,7 @@
           }
 
           isLoggedIn = true;
-          document.getElementById("loginOverlay").style.display = "none";
+          hideLoginOverlay();
 
           // 预加载历史记录
           fetchHistoryList().then((items) => {
@@ -1007,6 +1040,46 @@
             drawCanvas();
           }
         }
+      }
+
+      // 绘制欢迎提示信息
+      function drawWelcomeMessage() {
+        if (offscreenCanvas) return; // 如果已加载PDF，不绘制提示
+
+        ctx.fillStyle = "#f0f0f0";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#888";
+
+        // 字体高度为响应式设计，无最大字高限制
+        const fontSize = window.innerHeight * 0.025 * dpr; // 字体高度为视口高度的2.5%
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textAlign = "left";
+
+        // 绘制多行段落文字
+        const lines = [
+          "EasyPDF的文件要求：",
+          "1.网页仅识别PDF文件，且小于1MB；",
+          "2.文件内容中应包含1mx1m正方形，以便投影现场标定；",
+          "3.PDF文件应清晰整洁，格式参照合同附图标准，仅保留必要信息。",
+        ];
+
+        const lineHeight = fontSize * 1.6; // 行高为字体高度的1.6倍
+        const totalHeight = lines.length * lineHeight;
+        const startY = (canvas.height - totalHeight) / 2 + lineHeight * 0.8; // 垂直居中
+
+        // 找到最长的行，计算段落块宽度
+        let maxWidth = 0;
+        lines.forEach((line) => {
+          const width = ctx.measureText(line).width;
+          if (width > maxWidth) maxWidth = width;
+        });
+
+        // 计算段落块的起始X坐标，使段落块中心对齐视口中心
+        const startX = (canvas.width - maxWidth) / 2;
+
+        lines.forEach((line, index) => {
+          ctx.fillText(line, startX, startY + index * lineHeight);
+        });
       }
 
       // 将离屏画布绘制到主canvas
@@ -1135,6 +1208,8 @@
         // 确保画布更新
         drawCanvas();
         updateScaleInput();
+        // 检查最佳比例状态
+        checkBestScaleStatus();
       }
 
       // 中心缩放
@@ -1150,17 +1225,19 @@
         offsetY = newOffY;
         updateScaleInput();
         await refreshRender();
+        // 检查最佳比例状态
+        checkBestScaleStatus();
       }
 
       // ==================== PDF 加载核心 ====================
       async function loadPDFFromBuffer(buffer, fileName, storagePath = null) {
         // 检查登录状态
         if (!isLoggedIn) {
-          document.getElementById("loginOverlay").style.display = "flex";
+          showLoginOverlay();
           return;
         }
         try {
-          showLoading(true, "渲染中...");
+          showLoading(true, "加载渲染...");
           if (pdfDoc) pdfDoc.destroy?.();
           currentPage = null;
           offscreenCanvas = null;
@@ -1206,6 +1283,8 @@
             }
           }
           currentStoragePath = storagePath;
+          // 检查最佳比例状态
+          checkBestScaleStatus();
         } catch (err) {
           console.error("加载PDF失败", err);
           showLoading(false);
@@ -1217,11 +1296,10 @@
       async function loadFromSupabase(storagePath, fileName) {
         // 检查登录状态
         if (!isLoggedIn) {
-          document.getElementById("loginOverlay").style.display = "flex";
+          showLoginOverlay();
           return;
         }
         try {
-          showLoading(true, "加载历史文件...");
           const { data, error } = await supabaseClient.storage
             .from("PDFs")
             .download(storagePath);
@@ -1340,7 +1418,7 @@
 
         // 检查登录状态
         if (!isLoggedIn) {
-          document.getElementById("loginOverlay").style.display = "flex";
+          showLoginOverlay();
           return;
         }
 
@@ -1504,6 +1582,32 @@
       }
 
       // ==================== 缩略图 ====================
+      // 检查当前比例是否接近最佳比例
+      const BEST_SCALE_THRESHOLD = 0.02; // 最佳比例阈值，当差异小于2%时认为处于最佳比例状态
+      function checkBestScaleStatus() {
+        const bestScale = localStorage.getItem("easyPdfBestScale");
+        const icon = document.getElementById("bestScaleIcon");
+        if (!bestScale || !icon) return;
+
+        const currentScale = scale;
+        const savedScale = parseFloat(bestScale);
+        if (isNaN(savedScale)) return;
+
+        const scaleDiff = Math.abs(currentScale - savedScale) / savedScale;
+
+        if (scaleDiff < BEST_SCALE_THRESHOLD) {
+          // 处于最佳比例状态，显示红色实心爱心
+          icon.style.stroke = "#ff4d4f";
+          icon.style.fill = "#ff4d4f";
+          isUsingBestScale = true;
+        } else {
+          // 未处于最佳比例状态，显示黑色空心爱心
+          icon.style.stroke = "#333333";
+          icon.style.fill = "none";
+          isUsingBestScale = false;
+        }
+      }
+
       // ==================== 锁定模式 ====================
       let wasFullscreenBeforeLock = false;
       let instructionTimeout;
@@ -1724,7 +1828,7 @@
         if (pdfDoc && currentPage) return;
         // 检查登录状态
         if (!isLoggedIn) {
-          document.getElementById("loginOverlay").style.display = "flex";
+          showLoginOverlay();
           return;
         }
         fileInput.click();
@@ -1814,11 +1918,23 @@
           });
         }
 
+        // 点击登录框外部关闭登录框
+        const loginOverlay = document.getElementById("loginOverlay");
+        if (loginOverlay) {
+          loginOverlay.addEventListener("click", (e) => {
+            if (e.target === loginOverlay) {
+              hideLoginOverlay();
+            }
+          });
+        }
+
         // 监听尺寸变化
         const resizeObserver = new ResizeObserver(() => {
           resizeCanvas();
           if (offscreenCanvas) {
             drawCanvas();
+          } else {
+            drawWelcomeMessage();
           }
         });
         resizeObserver.observe(canvasArea);
@@ -1827,6 +1943,8 @@
           updateButtonPositions();
           if (offscreenCanvas) {
             drawCanvas();
+          } else {
+            drawWelcomeMessage();
           }
         });
 
@@ -1841,6 +1959,10 @@
 
         // 双击锁定/解锁
         canvas.addEventListener("dblclick", () => {
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
           toggleLock();
         });
 
@@ -1854,6 +1976,11 @@
           if (tapLength === 1) {
             if (currentTime - lastTouchTime < DOUBLE_TAP_DELAY) {
               // 检测到双击
+              if (!isLoggedIn) {
+                showLoginOverlay();
+                e.preventDefault();
+                return;
+              }
               toggleLock();
               e.preventDefault();
             }
@@ -1871,6 +1998,12 @@
 
         // 最佳比例按钮 - 双击保存最佳比例
         let isBestScaleSaved = false; // 标记是否已保存最佳比例
+
+        bestScaleBtn.addEventListener("click", () => {
+          if (!isLoggedIn) {
+            showLoginOverlay();
+          }
+        });
 
         bestScaleBtn.addEventListener("dblclick", async () => {
           if (locked) return;
@@ -1899,6 +2032,11 @@
           } else {
             showToast("已存储最佳比例（仅本地）");
           }
+
+          // 更新状态
+          isUsingBestScale = true;
+          // 检查最佳比例状态
+          checkBestScaleStatus();
         });
 
         // 显示提示信息
@@ -2076,17 +2214,29 @@
 
         // 为historyBtn添加点击事件处理
         historyBtn.addEventListener("click", (e) => {
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
           toggleHistoryMenu();
         });
         fullscreenBtn.addEventListener("click", () => {
           if (locked) return;
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
           toggleFullscreen();
         });
         // 重置按钮：切换最佳比例和全内容可看比例（带平滑动画）
-        let isUsingBestScale = false;
         let isAnimating = false;
         resetBtn.addEventListener("click", async () => {
-          if (locked || isAnimating || !currentPage) return;
+          if (locked || isAnimating) return;
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
+          if (!currentPage) return;
 
           isAnimating = true;
           const bestScale = localStorage.getItem("easyPdfBestScale");
@@ -2294,6 +2444,10 @@
         }
         fileBtn.addEventListener("click", () => {
           if (locked) return;
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
           // 记录当前全屏状态，文件选择器关闭后恢复
           const wasFullscreen = !!document.fullscreenElement;
           fileInput.click();
@@ -2309,11 +2463,21 @@
         });
 
         // 锁定按钮
-        lockBtnEl.addEventListener("click", toggleLock);
+        lockBtnEl.addEventListener("click", () => {
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
+          toggleLock();
+        });
 
         // 语音按钮
         thumbCard.addEventListener("mousedown", () => {
           if (locked) return;
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
           // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
           thumbCard.style.background = "#333333";
           const icon = thumbCard.querySelector("img");
@@ -2365,21 +2529,15 @@
 
         // 初始显示
         resizeCanvas();
-        ctx.fillStyle = "#f0f0f0";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#888";
-        // 字体高度与按钮高度一致，设置最小字高
-        const buttonHeight = Math.max(44, window.innerHeight * 0.125); // 按钮高度（最小44px）
-        const fontSize = Math.max(16, buttonHeight * 0.35); // 字体高度为按钮高度的35%，最小16px
-        ctx.font = `${fontSize * dpr}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.fillText("EasyPDF", canvas.width / 2, canvas.height / 2);
+        drawWelcomeMessage();
+        // 初始检查最佳比例状态
+        checkBestScaleStatus();
 
-        // 尝试加载第一个历史文件（静默失败）
-        const history = await fetchHistoryList();
-        if (history.length > 0) {
-          await loadFromSupabase(history[0].storage_path, history[0].file_name);
-        }
+        // 不自动加载历史文件，等待用户主动点击按钮
+        // const history = await fetchHistoryList();
+        // if (history.length > 0) {
+        //   await loadFromSupabase(history[0].storage_path, history[0].file_name);
+        // }
 
         // 页面刷新前保存状态到 Session Storage
         window.addEventListener("beforeunload", () => {
