@@ -1895,7 +1895,10 @@
             clearTimeout(touchMoveTimeout);
           }
           touchMoveTimeout = setTimeout(() => {
-            refreshRender();
+            refreshRender().then(() => {
+              // 检查最佳比例状态
+              checkBestScaleStatus();
+            });
             touchMoveTimeout = null;
           }, 16); // 约60fps的防抖延迟
 
@@ -2763,6 +2766,8 @@
                 // 使用 setTimeout 让出主线程，避免阻塞UI
                 setTimeout(() => {
                   refreshRender().then(() => {
+                    // 检查最佳比例状态
+                    checkBestScaleStatus();
                     resolve();
                   });
                 }, 0);
