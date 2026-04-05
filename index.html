@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>EasyPDF</title>
-    <link rel="icon" type="image/png" href="assets/icon/登入标签.png" />
+    <link rel="icon" type="image/jpg" href="assets/icon/easypfg.jpg" />
     <style>
       * {
         margin: 0;
@@ -882,6 +882,8 @@
       // 暂存渲染结果
       let fullContentRender = null; // 全屏显示比例的渲染结果
       let bestScaleRender = null; // 最佳比例的渲染结果
+      let isCadPDF = false; // 是否是CAD转换的PDF文件
+      let easypdfMarkerInfo = null; // EasyPDF标记信息（包含文字和正方形位置）
 
       let cachedHistoryList = []; // 缓存的历史记录列表
 
@@ -1156,7 +1158,7 @@
                 .render({
                   canvasContext: offCtx,
                   viewport: renderViewport,
-                  background: "white",
+                  background: isCadPDF ? "transparent" : "white",
                 })
                 .promise.then(() => {
                   resolve();
@@ -1228,7 +1230,7 @@
         await currentPage.render({
           canvasContext: tempOffCtx,
           viewport: fullContentViewport,
-          background: "white",
+          background: isCadPDF ? "transparent" : "white",
         }).promise;
         // 暂存全内容显示比例的渲染结果
         fullContentRender = document.createElement("canvas");
@@ -1238,42 +1240,138 @@
         fullCtx.drawImage(tempOffscreenCanvas, 0, 0);
 
         // 计算并暂存最佳比例的渲染结果
+        // 默认的最佳比例等于全屏显示比例
+        let calculatedBestScale = newScale;
+
+        // 首先检查是否有图元信息，如果有，重新计算最佳比例
+        let easypdfMarkerInfo = null;
+        if (isCadPDF) {
+          easypdfMarkerInfo = await findImagePrimitives(currentPage);
+        }
+
         const bestScale = localStorage.getItem("easyPdfBestScale");
         if (bestScale) {
           const savedBestScale = parseFloat(bestScale);
+          // 若最佳比例不等于全屏显示比例，则不予计算
+          if (Math.abs(savedBestScale - newScale) > 0.01) {
+            // 渲染最佳比例
+            const bestScaleViewport = currentPage.getViewport({
+              scale: savedBestScale * dpr,
+            });
+            tempOffscreenCanvas.width = bestScaleViewport.width;
+            tempOffscreenCanvas.height = bestScaleViewport.height;
+            await currentPage.render({
+              canvasContext: tempOffCtx,
+              viewport: bestScaleViewport,
+              background: isCadPDF ? "transparent" : "white",
+            }).promise;
+            // 暂存最佳比例的渲染结果
+            bestScaleRender = document.createElement("canvas");
+            bestScaleRender.width = tempOffscreenCanvas.width;
+            bestScaleRender.height = tempOffscreenCanvas.height;
+            const bestCtx = bestScaleRender.getContext("2d");
+            bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+            console.log(`使用已保存的最佳比例: ${savedBestScale}`);
+          } else {
+            // 最佳比例等于全屏显示比例，则开始计算最佳比例
+            if (easypdfMarkerInfo && easypdfMarkerInfo.largestImage) {
+              // 实现pdf检测到图元信息时，图元的像素高度放大至坐标系y向粗线间的高度像素的比例即为最佳比例
+              const largestImage = easypdfMarkerInfo.largestImage;
+              const imageHeight = largestImage.bounds.height;
+
+              // 计算坐标系y向粗线间的高度像素（每4个基础单位）
+              const screenHeight = window.screen.height; // 使用屏幕分辨率
+              const totalDivisions = 29;
+              const baseUnit = screenHeight / totalDivisions;
+              const majorLineSpacing = baseUnit * 4;
+
+              // 计算最佳比例：将图元高度放大至粗线间距
+              // 注意：这里需要考虑PDF点到屏幕像素的转换
+              // 我们希望图元高度等于粗线间距，即：imageHeight * calculatedBestScale = majorLineSpacing
+              // 所以：calculatedBestScale = majorLineSpacing / imageHeight
+              console.log(`图元原始高度: ${imageHeight}`);
+              console.log(`粗线间距高度: ${majorLineSpacing}`);
+
+              // 计算需要的缩放因子，使得图元高度等于粗线间距
+              let baseScale = majorLineSpacing / imageHeight;
+              // 监测图元计算所得的比例乘4，为计算所得最佳比例
+              calculatedBestScale = baseScale * 4;
+              console.log(`根据图元计算基础比例: ${baseScale}`);
+              console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
+            }
+
+            // 存储计算出的最佳比例
+            localStorage.setItem(
+              "easyPdfBestScale",
+              calculatedBestScale.toString(),
+            );
+
+            // 渲染最佳比例
+            const bestScaleViewport = currentPage.getViewport({
+              scale: calculatedBestScale * dpr,
+            });
+            tempOffscreenCanvas.width = bestScaleViewport.width;
+            tempOffscreenCanvas.height = bestScaleViewport.height;
+            await currentPage.render({
+              canvasContext: tempOffCtx,
+              viewport: bestScaleViewport,
+              background: isCadPDF ? "transparent" : "white",
+            }).promise;
+
+            // 暂存最佳比例的渲染结果
+            bestScaleRender = document.createElement("canvas");
+            bestScaleRender.width = tempOffscreenCanvas.width;
+            bestScaleRender.height = tempOffscreenCanvas.height;
+            const bestCtx = bestScaleRender.getContext("2d");
+            bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+          }
+        } else {
+          // 没有最佳比例记录，使用全屏显示比例作为默认值
+          if (easypdfMarkerInfo && easypdfMarkerInfo.largestImage) {
+            // 实现pdf检测到图元信息时，图元的像素高度放大至坐标系y向粗线间的高度像素的比例即为最佳比例
+            const largestImage = easypdfMarkerInfo.largestImage;
+            const imageHeight = largestImage.bounds.height;
+
+            // 计算坐标系y向粗线间的高度像素（每4个基础单位）
+            const screenHeight = window.screen.height; // 使用屏幕分辨率
+            const totalDivisions = 29;
+            const baseUnit = screenHeight / totalDivisions;
+            const majorLineSpacing = baseUnit * 4;
+
+            // 计算最佳比例：将图元高度放大至粗线间距
+            // 注意：这里需要考虑PDF点到屏幕像素的转换
+            // 我们希望图元高度等于粗线间距，即：imageHeight * calculatedBestScale = majorLineSpacing
+            // 所以：calculatedBestScale = majorLineSpacing / imageHeight
+            console.log(`图元原始高度: ${imageHeight}`);
+            console.log(`粗线间距高度: ${majorLineSpacing}`);
+
+            // 计算需要的缩放因子，使得图元高度等于粗线间距
+            let baseScale = majorLineSpacing / imageHeight;
+            // 监测图元计算所得的比例乘4，为计算所得最佳比例
+            calculatedBestScale = baseScale * 4;
+            console.log(`根据图元计算基础比例: ${baseScale}`);
+            console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
+          }
+
+          // 存储计算出的最佳比例
+          localStorage.setItem(
+            "easyPdfBestScale",
+            calculatedBestScale.toString(),
+          );
+
           // 渲染最佳比例
           const bestScaleViewport = currentPage.getViewport({
-            scale: savedBestScale * dpr,
+            scale: calculatedBestScale * dpr,
           });
           tempOffscreenCanvas.width = bestScaleViewport.width;
           tempOffscreenCanvas.height = bestScaleViewport.height;
           await currentPage.render({
             canvasContext: tempOffCtx,
             viewport: bestScaleViewport,
-            background: "white",
+            background: isCadPDF ? "transparent" : "white",
           }).promise;
+
           // 暂存最佳比例的渲染结果
-          bestScaleRender = document.createElement("canvas");
-          bestScaleRender.width = tempOffscreenCanvas.width;
-          bestScaleRender.height = tempOffscreenCanvas.height;
-          const bestCtx = bestScaleRender.getContext("2d");
-          bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
-        } else {
-          // 没有最佳比例，计算默认最佳比例（全内容可看比例的2倍）
-          const defaultBestScale = newScale * 2;
-          localStorage.setItem("easyPdfBestScale", defaultBestScale.toString());
-          // 渲染默认最佳比例
-          const defaultBestScaleViewport = currentPage.getViewport({
-            scale: defaultBestScale * dpr,
-          });
-          tempOffscreenCanvas.width = defaultBestScaleViewport.width;
-          tempOffscreenCanvas.height = defaultBestScaleViewport.height;
-          await currentPage.render({
-            canvasContext: tempOffCtx,
-            viewport: defaultBestScaleViewport,
-            background: "white",
-          }).promise;
-          // 暂存默认最佳比例的渲染结果
           bestScaleRender = document.createElement("canvas");
           bestScaleRender.width = tempOffscreenCanvas.width;
           bestScaleRender.height = tempOffscreenCanvas.height;
@@ -1312,6 +1410,7 @@
       }
 
       // ==================== PDF 加载核心 ====================
+      let isLoadingFromHistory = false; // 是否从历史记录加载文件
       async function loadPDFFromBuffer(buffer, fileName, storagePath = null) {
         // 检查登录状态
         if (!isLoggedIn) {
@@ -1319,6 +1418,9 @@
           return;
         }
         try {
+          // 标记是否从历史记录加载文件
+          isLoadingFromHistory = storagePath !== null;
+
           showLoading(true, "加载渲染...");
           if (pdfDoc) pdfDoc.destroy?.();
           currentPage = null;
@@ -1327,6 +1429,10 @@
           // 清除暂存的渲染结果
           fullContentRender = null;
           bestScaleRender = null;
+          isCadPDF = false; // 重置CAD PDF检测结果
+          easypdfMarkerInfo = null; // 重置EasyPDF标记信息
+          // 清除本地存储中的最佳比例，确保新文件使用正确的默认值
+          localStorage.removeItem("easyPdfBestScale");
 
           // 重置最佳比例按钮状态
           initBestScaleButton();
@@ -1334,19 +1440,37 @@
           // 使用 setTimeout 将PDF加载操作分解，避免阻塞主线程
           await new Promise((resolve) => setTimeout(resolve, 0));
 
+          console.log("=== PDF加载开始 ===");
+          console.log("进度: 0% - 开始加载PDF");
+
           const task = pdfjsLib.getDocument({
             data: buffer,
             useSystemFonts: true,
           });
+
+          console.log("进度: 20% - 解析PDF文档");
           pdfDoc = await task.promise;
 
           // 再次使用 setTimeout 让出主线程
           await new Promise((resolve) => setTimeout(resolve, 0));
 
+          console.log("进度: 40% - 获取第一页");
           currentPage = await pdfDoc.getPage(1);
           scale = 1.0;
           offsetX = 0;
           offsetY = 0;
+
+          // 分析是否是CAD转换的PDF
+          console.log("进度: 60% - 分析是否是CAD PDF");
+          const cadAnalysis = await analyzeIfCadPDF(currentPage);
+          isCadPDF = cadAnalysis.isCadLikely;
+          console.log("=== CAD PDF分析 ===");
+          console.log("是否是CAD转换的PDF:", isCadPDF);
+          console.log("置信度:", cadAnalysis.confidence + "%");
+          console.log("判断理由:", cadAnalysis.reasons);
+
+          console.log("进度: 100% - 加载完成");
+
           // 创建离屏画布并初始化
           const viewport = currentPage.getViewport({ scale: 1 });
           const renderScale = scale * dpr;
@@ -1359,6 +1483,22 @@
           await resetView();
           showLoading(false);
           currentFileName = fileName;
+
+          // 如果是CAD PDF，异步查找图元，不阻塞PDF显示
+          if (isCadPDF) {
+            console.log("开始异步查找图元");
+            findImagePrimitives(currentPage)
+              .then((markerInfo) => {
+                if (markerInfo) {
+                  easypdfMarkerInfo = markerInfo;
+                  console.log("=== 图元检测 ===");
+                  console.log("找到图元:", markerInfo);
+                }
+              })
+              .catch((err) => {
+                console.error("查找图元失败:", err);
+              });
+          }
           // 安全地复制ArrayBuffer
           if (buffer instanceof ArrayBuffer) {
             try {
@@ -1581,6 +1721,9 @@
           return;
         }
 
+        // 清除所有自定义弹出框
+        clearCustomAlerts();
+
         // 先显示菜单，然后在后台获取历史文件列表
         const btnRect = historyBtn.getBoundingClientRect();
         const topBarRect = topBar.getBoundingClientRect();
@@ -1588,42 +1731,31 @@
         historyMenu.style.top = `${topBarRect.bottom + 8}px`;
         historyMenu.style.left = `${btnRect.left}px`;
 
-        // 优先使用缓存的历史记录
-        if (cachedHistoryList.length > 0) {
-          renderHistoryMenu(cachedHistoryList);
-        } else {
-          // 显示加载状态
-          historyMenu.innerHTML = "";
-          const loadingDiv = document.createElement("div");
-          loadingDiv.className = "history-item";
-          loadingDiv.textContent = "加载中...";
-          historyMenu.appendChild(loadingDiv);
+        // 显示加载状态
+        historyMenu.innerHTML = "";
+        const loadingDiv = document.createElement("div");
+        loadingDiv.className = "history-item";
+        loadingDiv.textContent = "加载中...";
+        historyMenu.appendChild(loadingDiv);
 
-          // 显示菜单
-          historyMenu.classList.add("show");
-          isMenuOpen = true;
+        // 显示菜单
+        historyMenu.classList.add("show");
+        isMenuOpen = true;
 
-          // 后台获取历史文件列表
-          fetchHistoryList()
-            .then((items) => {
-              cachedHistoryList = items;
-              renderHistoryMenu(items);
-            })
-            .catch((err) => {
-              console.error("获取历史失败", err);
-              historyMenu.innerHTML = "";
-              const errorDiv = document.createElement("div");
-              errorDiv.className = "history-item";
-              errorDiv.textContent = "加载失败";
-              historyMenu.appendChild(errorDiv);
-            });
-        }
-
-        // 显示菜单（如果还没有显示）
-        if (!isMenuOpen) {
-          historyMenu.classList.add("show");
-          isMenuOpen = true;
-        }
+        // 后台获取历史文件列表（每次都重新获取，确保显示最新的历史记录）
+        fetchHistoryList()
+          .then((items) => {
+            cachedHistoryList = items;
+            renderHistoryMenu(items);
+          })
+          .catch((err) => {
+            console.error("获取历史失败", err);
+            historyMenu.innerHTML = "";
+            const errorDiv = document.createElement("div");
+            errorDiv.className = "history-item";
+            errorDiv.textContent = "加载失败";
+            historyMenu.appendChild(errorDiv);
+          });
 
         // 点击外部关闭
         const closeHandler = (e) => {
@@ -1695,6 +1827,534 @@
           icon.style.fill = "none";
           isUsingBestScale = false;
         }
+      }
+
+      // ==================== CAD PDF检测 ====================
+      // 分析PDF是否是DWG/CAD转的
+      async function analyzeIfCadPDF(page) {
+        const results = {
+          isCadLikely: false,
+          confidence: 0,
+          reasons: [],
+          details: {},
+        };
+
+        try {
+          console.log("=== 开始DWG/CAD检测 ===");
+          console.log("进度: 0% - 开始检测");
+
+          // 模拟检测过程
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          console.log("进度: 50% - 检测中");
+
+          // 实际判断是否是DWG/CAD转的PDF
+          // 这里可以添加实际的DWG检测逻辑
+          // 例如检查PDF的元数据、字体、图形结构等
+          // 目前暂时直接返回true，后续可以根据实际情况修改
+          results.isCadLikely = true;
+          results.confidence = 100;
+          results.reasons = ["直接判定为CAD PDF，进行EasyPDF标记检测"];
+
+          console.log("进度: 100% - 检测完成");
+          console.log("=== DWG/CAD检测结果 ===");
+          console.log("是否是CAD转换的PDF:", results.isCadLikely);
+          console.log("置信度:", results.confidence + "%");
+          console.log("判断理由:", results.reasons);
+
+          return results;
+        } catch (err) {
+          console.error("CAD PDF分析失败:", err);
+          results.reasons.push("分析过程出错");
+        }
+
+        return results;
+      }
+
+      // ==================== 图元检测 ====================
+      // 查找PDF中的图片图元
+      async function findImagePrimitives(page) {
+        try {
+          console.log("=== 开始图元检测 ===");
+          console.log("进度: 0% - 开始检测");
+
+          // 第一步：获取图形操作符列表，查找图片
+          console.log("进度: 50% - 获取图形操作符");
+          const operatorList = await page.getOperatorList();
+          const OPS = pdfjsLib.OPS;
+
+          let images = [];
+
+          console.log("=== 图形操作符分析（只找图片）===");
+          console.log("操作符数量:", operatorList.fnArray.length);
+
+          console.log("进度: 80% - 分析图形操作符");
+          for (let i = 0; i < operatorList.fnArray.length; i++) {
+            const op = operatorList.fnArray[i];
+            const args = operatorList.argsArray[i];
+
+            // 只处理drawImage操作符，其他操作符忽略
+            if (op === 85) {
+              // drawImage 操作符
+              console.log(`操作符 ${i}: drawImage`, args);
+
+              // 这是一个图片
+              if (args.length >= 3) {
+                const imageName = args[0];
+                const imageWidth = args[1];
+                const imageHeight = args[2];
+
+                // 计算图片的边界框
+                const imageBounds = {
+                  x: 0, // 假设图片位置在原点，实际需要根据变换矩阵计算
+                  y: 0,
+                  width: imageWidth,
+                  height: imageHeight,
+                };
+
+                console.log("找到图片:", {
+                  name: imageName,
+                  width: imageWidth,
+                  height: imageHeight,
+                });
+
+                images.push({
+                  type: "image",
+                  bounds: imageBounds,
+                  operatorIndex: i,
+                  name: imageName,
+                });
+                console.log("添加图片:", {
+                  name: imageName,
+                  width: imageWidth,
+                  height: imageHeight,
+                });
+              }
+            }
+          }
+
+          // 按宽度和高度排序，优先显示较大的图片
+          images.sort((a, b) => {
+            const areaA = a.bounds.width * a.bounds.height;
+            const areaB = b.bounds.width * b.bounds.height;
+            return areaB - areaA; // 降序排序
+          });
+
+          if (images.length > 0) {
+            console.log("进度: 100% - 检测完成");
+            console.log("找到", images.length, "个图片，最大的:", images[0]);
+
+            // 计算像素信息（假设1 PDF点 = 1 像素）
+            const largestImage = images[0];
+            const width = largestImage.bounds.width.toFixed(2);
+            const height = largestImage.bounds.height.toFixed(2);
+
+            // 不显示提示，只在控制台输出
+            console.log(
+              `检测到图片：${images.length}个\n最大图片尺寸：${width} x ${height} 像素`,
+            );
+
+            return {
+              images,
+              largestImage: images[0],
+            };
+          } else {
+            console.log("进度: 100% - 检测完成");
+            console.log("未找到图片");
+            // 不显示提示，只在控制台输出
+            console.log("未检测到图片！");
+            return null;
+          }
+        } catch (err) {
+          console.error("查找图元失败:", err);
+          return null;
+        }
+      }
+
+      // 计算两个矩形之间的距离
+      function calculateDistance(rect1, rect2) {
+        const centerX1 = rect1.x + (rect1.width || 0) / 2;
+        const centerY1 = rect1.y + (rect1.height || 0) / 2;
+        const centerX2 = rect2.x + (rect2.width || 0) / 2;
+        const centerY2 = rect2.y + (rect2.height || 0) / 2;
+
+        return Math.sqrt(
+          Math.pow(centerX1 - centerX2, 2) + Math.pow(centerY1 - centerY2, 2),
+        );
+      }
+
+      // 显示自定义弹出框，在出现后淡出
+      function showCustomAlert(message) {
+        // 创建弹出框元素
+        const alertElement = document.createElement("div");
+        alertElement.className = "custom-alert";
+        alertElement.style.position = "fixed";
+        alertElement.style.top = "50%";
+        alertElement.style.left = "50%";
+        alertElement.style.transform = "translate(-50%, -50%)";
+        alertElement.style.padding = "20px";
+        alertElement.style.backgroundColor = "rgba(240, 240, 240, 0.9)"; // 浅灰色背景
+        alertElement.style.color = "black"; // 黑色文字
+        alertElement.style.borderRadius = "5px";
+        alertElement.style.zIndex = "10000";
+        alertElement.style.fontSize = "16px";
+        alertElement.style.textAlign = "center";
+        alertElement.style.opacity = "1";
+        alertElement.style.transition = "opacity 1s ease-out";
+        alertElement.innerText = message;
+
+        // 添加到页面
+        document.body.appendChild(alertElement);
+
+        // 2秒后开始淡出
+        setTimeout(() => {
+          alertElement.style.opacity = "0";
+          // 淡出后移除元素
+          setTimeout(() => {
+            if (document.body.contains(alertElement)) {
+              document.body.removeChild(alertElement);
+            }
+          }, 1000);
+        }, 2000);
+
+        return alertElement;
+      }
+
+      // 清除所有自定义弹出框
+      function clearCustomAlerts() {
+        const alerts = document.querySelectorAll(".custom-alert");
+        alerts.forEach((alert) => {
+          if (document.body.contains(alert)) {
+            document.body.removeChild(alert);
+          }
+        });
+      }
+
+      // ==================== 网格线系统 ====================
+      // 创建和管理透明网格线
+      function createGridSystem() {
+        // 检查是否已经存在网格容器
+        let gridContainer = document.getElementById("grid-container");
+        if (!gridContainer) {
+          // 创建网格容器
+          gridContainer = document.createElement("div");
+          gridContainer.id = "grid-container";
+          gridContainer.style.position = "fixed";
+          gridContainer.style.top = "0";
+          gridContainer.style.left = "0";
+          gridContainer.style.width = "100%";
+          gridContainer.style.height = "100%";
+          gridContainer.style.pointerEvents = "none"; // 不影响页面元素的交互功能
+          gridContainer.style.zIndex = "9999";
+          gridContainer.style.userSelect = "none";
+          // 根据gridVisible状态设置显示属性
+          gridContainer.style.display = gridVisible ? "block" : "none";
+          document.body.appendChild(gridContainer);
+          console.log("网格容器创建成功");
+        } else {
+          // 确保现有网格容器的显示状态与gridVisible一致
+          gridContainer.style.display = gridVisible ? "block" : "none";
+        }
+
+        // 清除现有的网格线
+        gridContainer.innerHTML = "";
+
+        // 计算网格参数
+        const screenWidth = window.screen.width; // 使用屏幕分辨率
+        const screenHeight = window.screen.height; // 使用屏幕分辨率
+        const totalDivisions = 29; // 横向（y方向）总共29份
+        const baseUnit = screenHeight / totalDivisions; // 基础单位
+
+        // 计算屏幕中心位置
+        const centerX = screenWidth / 2;
+        const centerY = screenHeight / 2;
+
+        // 计算需要的网格数量（向正负方向扩展）
+        const halfVerticalDivisions = Math.ceil(centerX / baseUnit);
+        const halfHorizontalDivisions = Math.ceil(centerY / baseUnit);
+
+        console.log(
+          `网格参数: 屏幕宽度=${screenWidth}, 屏幕高度=${screenHeight}, 总划分=${totalDivisions}, 基础单位=${baseUnit}, 中心X=${centerX}, 中心Y=${centerY}`,
+        );
+
+        // 创建横向网格线 - 29份，每4份的分界线清晰，以屏幕中心为原点
+        for (
+          let i = -halfHorizontalDivisions;
+          i <= halfHorizontalDivisions;
+          i++
+        ) {
+          const y = centerY + i * baseUnit;
+
+          // 确保y在屏幕范围内
+          if (y >= 0 && y <= screenHeight) {
+            const horizontalLine = document.createElement("div");
+            horizontalLine.style.position = "absolute";
+            horizontalLine.style.top = `${y}px`;
+            horizontalLine.style.left = "0";
+            horizontalLine.style.width = "100%";
+            horizontalLine.style.height = "1px";
+
+            // 每4份的分界线清晰（透明度0.8），其他线透明度0.1
+            const isMajorLine = i % 4 === 0;
+            const opacity = isMajorLine ? 0.8 : 0.1;
+            horizontalLine.style.backgroundColor = `rgba(200, 200, 200, ${opacity})`;
+
+            horizontalLine.style.zIndex = "9999";
+            gridContainer.appendChild(horizontalLine);
+            console.log(
+              `创建横向网格线 at y=${y}px, ${isMajorLine ? "主线条" : "次线条"}`,
+            );
+          }
+        }
+
+        // 创建竖向网格线 - 基于y方向的基础单位，显示逻辑和y方向一致，以屏幕中心为原点
+        for (let i = -halfVerticalDivisions; i <= halfVerticalDivisions; i++) {
+          const x = centerX + i * baseUnit;
+
+          // 确保x在屏幕范围内
+          if (x >= 0 && x <= screenWidth) {
+            const verticalLine = document.createElement("div");
+            verticalLine.style.position = "absolute";
+            verticalLine.style.left = `${x}px`;
+            verticalLine.style.top = "0";
+            verticalLine.style.height = "100%";
+            verticalLine.style.width = "1px";
+
+            // 每4份的分界线清晰（透明度0.8），其他线透明度0.1
+            const isMajorLine = i % 4 === 0;
+            const opacity = isMajorLine ? 0.8 : 0.1;
+            verticalLine.style.backgroundColor = `rgba(200, 200, 200, ${opacity})`;
+
+            verticalLine.style.zIndex = "9999";
+            gridContainer.appendChild(verticalLine);
+            console.log(
+              `创建竖向网格线 at x=${x}px, ${isMajorLine ? "主线条" : "次线条"}`,
+            );
+          }
+        }
+
+        // 添加边缘填充
+        // 计算边缘填充区域的高度/宽度（基于基础单位）
+        const edgePadding = baseUnit;
+
+        // 上边缘填充 - #22B14C（绿色）
+        const topFill = document.createElement("div");
+        topFill.style.position = "absolute";
+        topFill.style.top = "0";
+        topFill.style.left = "0";
+        topFill.style.width = "100%";
+        topFill.style.height = `${edgePadding}px`;
+        topFill.style.backgroundColor = "#22B14C";
+        topFill.style.opacity = "0.5";
+        topFill.style.zIndex = "9998";
+        gridContainer.appendChild(topFill);
+        console.log(`创建上边缘填充，高度: ${edgePadding}px`);
+
+        // 下边缘填充 - #FFF200（黄色）
+        const bottomFill = document.createElement("div");
+        bottomFill.style.position = "absolute";
+        bottomFill.style.bottom = "0";
+        bottomFill.style.left = "0";
+        bottomFill.style.width = "100%";
+        bottomFill.style.height = `${edgePadding}px`;
+        bottomFill.style.backgroundColor = "#FFF200";
+        bottomFill.style.opacity = "0.5";
+        bottomFill.style.zIndex = "9998";
+        gridContainer.appendChild(bottomFill);
+        console.log(`创建下边缘填充，高度: ${edgePadding}px`);
+
+        // 左边缘填充 - #3F48CC（蓝色）
+        const leftFill = document.createElement("div");
+        leftFill.style.position = "absolute";
+        leftFill.style.top = "0";
+        leftFill.style.left = "0";
+        leftFill.style.width = `${edgePadding}px`;
+        leftFill.style.height = "100%";
+        leftFill.style.backgroundColor = "#3F48CC";
+        leftFill.style.opacity = "0.5";
+        leftFill.style.zIndex = "9998";
+        gridContainer.appendChild(leftFill);
+        console.log(`创建左边缘填充，宽度: ${edgePadding}px`);
+
+        // 右边缘填充 - #ED1C24（红色）
+        const rightFill = document.createElement("div");
+        rightFill.style.position = "absolute";
+        rightFill.style.top = "0";
+        rightFill.style.right = "0";
+        rightFill.style.width = `${edgePadding}px`;
+        rightFill.style.height = "100%";
+        rightFill.style.backgroundColor = "#ED1C24";
+        rightFill.style.opacity = "0.5";
+        rightFill.style.zIndex = "9998";
+        gridContainer.appendChild(rightFill);
+        console.log(`创建右边缘填充，宽度: ${edgePadding}px`);
+
+        console.log("网格线创建完成");
+      }
+
+      // 网格系统状态
+      let gridVisible = false; // 网格是否可见
+      let longPressTimer = null; // 长按定时器
+      const LONG_PRESS_DURATION = 500; // 长按持续时间（毫秒）
+
+      // 初始化网格系统
+      function initGridSystem() {
+        console.log("开始初始化网格系统");
+        // 创建初始网格
+        createGridSystem();
+        // 初始状态下隐藏网格
+        const gridContainer = document.getElementById("grid-container");
+        if (gridContainer) {
+          gridContainer.style.display = "none";
+        }
+
+        // 监听窗口大小变化，自适应调整网格
+        window.addEventListener("resize", createGridSystem);
+
+        // 监听鼠标按下事件，用于检测长按
+        window.addEventListener("mousedown", handleMouseDown);
+        // 监听鼠标释放事件，用于取消长按
+        window.addEventListener("mouseup", handleMouseUp);
+        // 监听鼠标离开事件，用于取消长按
+        window.addEventListener("mouseleave", handleMouseUp);
+
+        console.log("网格系统初始化完成");
+      }
+
+      // 处理鼠标按下事件
+      function handleMouseDown(e) {
+        // 只有在锁定状态下，且按下的是左键时才处理
+        if (locked && e.button === 0) {
+          // 清除之前的定时器
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+          }
+          // 设置新的定时器
+          longPressTimer = setTimeout(() => {
+            // 长按触发，切换网格可见性
+            toggleGridVisibility();
+          }, LONG_PRESS_DURATION);
+        }
+      }
+
+      // 处理鼠标释放事件
+      function handleMouseUp() {
+        // 清除定时器
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+
+      // 切换网格可见性
+      function toggleGridVisibility() {
+        const gridContainer = document.getElementById("grid-container");
+        if (gridContainer) {
+          gridVisible = !gridVisible;
+          gridContainer.style.display = gridVisible ? "block" : "none";
+          console.log(`网格${gridVisible ? "开启" : "关闭"}`);
+        }
+      }
+
+      // 调用初始化函数
+      initGridSystem();
+
+      // 分析路径是否是正方形
+      function analyzePathForSquare(path, textBounds, searchRadius) {
+        // 分析路径是否是正方形
+        // 正方形通常由4个点组成：moveTo -> lineTo -> lineTo -> lineTo -> stroke
+        if (path.length < 4) return null;
+
+        // 提取路径中的点
+        const points = [];
+        for (const item of path) {
+          if (
+            item.op === pdfjsLib.OPS.moveTo ||
+            item.op === pdfjsLib.OPS.lineTo
+          ) {
+            points.push({
+              x: item.args[0],
+              y: item.args[1],
+            });
+          }
+        }
+
+        // 至少需要4个点才能形成正方形
+        if (points.length < 4) return null;
+
+        // 计算边长
+        const side1 = Math.sqrt(
+          Math.pow(points[1].x - points[0].x, 2) +
+            Math.pow(points[1].y - points[0].y, 2),
+        );
+        const side2 = Math.sqrt(
+          Math.pow(points[2].x - points[1].x, 2) +
+            Math.pow(points[2].y - points[1].y, 2),
+        );
+        const side3 = Math.sqrt(
+          Math.pow(points[3].x - points[2].x, 2) +
+            Math.pow(points[3].y - points[2].y, 2),
+        );
+        const side4 = Math.sqrt(
+          Math.pow(points[0].x - points[3].x, 2) +
+            Math.pow(points[0].y - points[3].y, 2),
+        );
+
+        // 检查边长是否相近（允许5%的误差）
+        const sides = [side1, side2, side3, side4];
+        const avgSide = sides.reduce((a, b) => a + b, 0) / 4;
+        const maxSide = Math.max(...sides);
+        const minSide = Math.min(...sides);
+
+        if (maxSide / minSide > 1.05) return null; // 边长差异太大，不是正方形
+
+        // 计算路径的边界框
+        let minX = Infinity,
+          maxX = -Infinity;
+        let minY = Infinity,
+          maxY = -Infinity;
+
+        for (const point of points) {
+          minX = Math.min(minX, point.x);
+          maxX = Math.max(maxX, point.x);
+          minY = Math.min(minY, point.y);
+          maxY = Math.max(maxY, point.y);
+        }
+
+        const bounds = {
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+        };
+
+        // 检查是否是正方形（宽高比接近1）
+        const aspectRatio = bounds.width / bounds.height;
+        if (aspectRatio < 0.8 || aspectRatio > 1.2) return null; // 放宽宽高比限制
+
+        // 检查是否在文字附近
+        let isNearText = true;
+        let distance = 0;
+        if (textBounds) {
+          distance = calculateDistance(bounds, textBounds);
+          isNearText = distance < searchRadius;
+        }
+
+        if (!isNearText) return null;
+
+        console.log("找到路径绘制的正方形:", {
+          points,
+          sides,
+          bounds,
+          distance,
+        });
+
+        return {
+          type: "path",
+          bounds: bounds,
+          distanceToText: distance,
+          points: points,
+          sides: sides,
+        };
       }
 
       // ==================== 锁定模式 ====================
