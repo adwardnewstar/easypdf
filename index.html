@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>EasyPDF</title>
-    <link rel="icon" type="image/jpg" href="assets/icon/easypfg.jpg" />
+    <link rel="icon" type="image/jpg" href="assets/icon/easypdf.jpg" />
     <style>
       * {
         margin: 0;
@@ -1253,10 +1253,19 @@
         }
 
         const bestScale = localStorage.getItem("easyPdfBestScale");
+        const isUserSavedBestScale =
+          localStorage.getItem("easyPdfUserSavedBestScale") === "true";
+        let finalScale = newScale; // 默认使用全屏显示比例
+
         if (bestScale) {
           const savedBestScale = parseFloat(bestScale);
-          // 若最佳比例不等于全屏显示比例，则不予计算
-          if (Math.abs(savedBestScale - newScale) > 0.01) {
+
+          // 规则1：如果读取了最佳比例（最佳比例不等于全屏显示比例），则最佳比例最高
+          // 规则3：如果计算所得最佳比例与用户自己识别的最佳比例不一致时，以用户识别最高
+          if (
+            Math.abs(savedBestScale - newScale) > 0.01 ||
+            isUserSavedBestScale
+          ) {
             // 渲染最佳比例
             const bestScaleViewport = currentPage.getViewport({
               scale: savedBestScale * dpr,
@@ -1275,8 +1284,10 @@
             const bestCtx = bestScaleRender.getContext("2d");
             bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
             console.log(`使用已保存的最佳比例: ${savedBestScale}`);
+            // 使用已保存的最佳比例
+            finalScale = savedBestScale;
           } else {
-            // 最佳比例等于全屏显示比例，则开始计算最佳比例
+            // 规则2：如果最佳比例按钮等于全屏显示比例，且通过图元识别计算出最佳比例，则最佳比例更新并写入
             if (easypdfMarkerInfo && easypdfMarkerInfo.largestImage) {
               // 实现pdf检测到图元信息时，图元的像素高度放大至坐标系y向粗线间的高度像素的比例即为最佳比例
               const largestImage = easypdfMarkerInfo.largestImage;
@@ -1301,13 +1312,16 @@
               calculatedBestScale = baseScale * 4;
               console.log(`根据图元计算基础比例: ${baseScale}`);
               console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
+              // 使用计算出的最佳比例
+              finalScale = calculatedBestScale;
             }
 
-            // 存储计算出的最佳比例
+            // 存储计算出的最佳比例（标记为系统计算，非用户保存）
             localStorage.setItem(
               "easyPdfBestScale",
               calculatedBestScale.toString(),
             );
+            localStorage.setItem("easyPdfUserSavedBestScale", "false");
 
             // 渲染最佳比例
             const bestScaleViewport = currentPage.getViewport({
@@ -1354,13 +1368,16 @@
             calculatedBestScale = baseScale * 4;
             console.log(`根据图元计算基础比例: ${baseScale}`);
             console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
+            // 使用计算出的最佳比例
+            finalScale = calculatedBestScale;
           }
 
-          // 存储计算出的最佳比例
+          // 存储计算出的最佳比例（标记为系统计算，非用户保存）
           localStorage.setItem(
             "easyPdfBestScale",
             calculatedBestScale.toString(),
           );
+          localStorage.setItem("easyPdfUserSavedBestScale", "false");
 
           // 渲染最佳比例
           const bestScaleViewport = currentPage.getViewport({
@@ -1382,11 +1399,11 @@
           bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
         }
 
-        // 设置为全内容显示比例
-        scale = newScale;
+        // 设置为最终确定的比例
+        scale = finalScale;
         // 计算居中偏移量
-        const viewportWidth = viewport.width * newScale * dpr;
-        const viewportHeight = viewport.height * newScale * dpr;
+        const viewportWidth = viewport.width * finalScale * dpr;
+        const viewportHeight = viewport.height * finalScale * dpr;
         offsetX = (canvas.width - viewportWidth) / 2;
         offsetY = (canvas.height - viewportHeight) / 2;
         // 等待渲染完成
@@ -2723,14 +2740,99 @@
           scaleAtPoint(val / 100, canvas.width / 2, canvas.height / 2);
         });
 
-        // 最佳比例按钮 - 双击保存最佳比例
+        // 最佳比例按钮 - 双击保存最佳比例，长按重置最佳比例
         let isBestScaleSaved = false; // 标记是否已保存最佳比例
+        let bestScaleLongPressTimer = null; // 长按定时器
+        const BEST_SCALE_LONG_PRESS_DURATION = 500; // 长按持续时间（毫秒）
 
         bestScaleBtn.addEventListener("click", () => {
           if (!isLoggedIn) {
             showLoginOverlay();
           }
         });
+
+        // 长按重置最佳比例
+        bestScaleBtn.addEventListener("mousedown", () => {
+          if (locked) return;
+          // 清除之前的定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+          }
+          // 设置新的定时器
+          bestScaleLongPressTimer = setTimeout(() => {
+            // 长按触发，重置最佳比例
+            resetBestScale();
+          }, BEST_SCALE_LONG_PRESS_DURATION);
+        });
+
+        bestScaleBtn.addEventListener("mouseup", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        bestScaleBtn.addEventListener("mouseleave", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        // 重置最佳比例
+        async function resetBestScale() {
+          if (!currentPage) return;
+
+          // 计算全屏显示比例
+          const rect = canvasArea.getBoundingClientRect();
+          let canvasW = rect.width;
+          let canvasH = rect.height;
+          if (canvasW < 10) canvasW = window.innerWidth;
+          if (canvasH < 10) canvasH = window.innerHeight;
+          canvasW = canvasW * dpr;
+          canvasH = canvasH * dpr;
+          const viewport = currentPage.getViewport({ scale: 1 });
+          const imgW = viewport.width * dpr;
+          const imgH = viewport.height * dpr;
+          const fullScreenScale = Math.min(canvasW / imgW, canvasH / imgH);
+
+          // 重置最佳比例为全屏显示比例
+          localStorage.setItem("easyPdfBestScale", fullScreenScale.toString());
+          // 清除用户保存标记
+          localStorage.setItem("easyPdfUserSavedBestScale", "false");
+
+          // 更新最佳比例的暂存渲染结果
+          const bestScaleViewport = currentPage.getViewport({
+            scale: fullScreenScale * dpr,
+          });
+          const tempOffscreenCanvas = document.createElement("canvas");
+          tempOffscreenCanvas.width = bestScaleViewport.width;
+          tempOffscreenCanvas.height = bestScaleViewport.height;
+          const tempOffCtx = tempOffscreenCanvas.getContext("2d");
+          await currentPage.render({
+            canvasContext: tempOffCtx,
+            viewport: bestScaleViewport,
+            background: isCadPDF ? "transparent" : "white",
+          }).promise;
+          // 更新最佳比例的暂存渲染结果
+          bestScaleRender = document.createElement("canvas");
+          bestScaleRender.width = tempOffscreenCanvas.width;
+          bestScaleRender.height = tempOffscreenCanvas.height;
+          const bestCtx = bestScaleRender.getContext("2d");
+          bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+
+          // 更新图标为黑色空心
+          const icon = document.getElementById("bestScaleIcon");
+          if (icon) {
+            icon.style.stroke = "#333333";
+            icon.style.fill = "none";
+          }
+
+          showToast("已重置最佳比例");
+          console.log(`已重置最佳比例为全屏显示比例: ${fullScreenScale}`);
+        }
 
         bestScaleBtn.addEventListener("dblclick", async () => {
           if (locked) return;
@@ -2744,8 +2846,9 @@
             icon.style.fill = "#ff4d4f";
           }
 
-          // 存储当前比例为最佳比例到本地
+          // 存储当前比例为最佳比例到本地（标记为用户保存）
           localStorage.setItem("easyPdfBestScale", scale);
+          localStorage.setItem("easyPdfUserSavedBestScale", "true");
 
           // 重新计算并更新最佳比例的暂存渲染结果
           if (currentPage && offscreenCanvas) {
@@ -3443,7 +3546,6 @@
 
         // 语音按钮
         thumbCard.addEventListener("mousedown", () => {
-          if (locked) return;
           if (!isLoggedIn) {
             showLoginOverlay();
             return;
@@ -3457,7 +3559,6 @@
         });
 
         thumbCard.addEventListener("mouseup", () => {
-          if (locked) return;
           // 长按结束：平滑过渡到原始状态
           thumbCard.style.background = "#c3c3c3";
           const icon = thumbCard.querySelector("img");
@@ -3467,7 +3568,6 @@
         });
 
         thumbCard.addEventListener("mouseleave", () => {
-          if (locked) return;
           // 鼠标离开：恢复原始状态
           thumbCard.style.background = "#c3c3c3";
           const icon = thumbCard.querySelector("img");
@@ -3478,7 +3578,10 @@
 
         // 触摸设备支持
         thumbCard.addEventListener("touchstart", () => {
-          if (locked) return;
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
           // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
           thumbCard.style.background = "#333333";
           const icon = thumbCard.querySelector("img");
@@ -3488,7 +3591,6 @@
         });
 
         thumbCard.addEventListener("touchend", () => {
-          if (locked) return;
           // 长按结束：平滑过渡到原始状态
           thumbCard.style.background = "#c3c3c3";
           const icon = thumbCard.querySelector("img");
