@@ -1246,48 +1246,132 @@
         // 默认的最佳比例等于全屏显示比例
         let calculatedBestScale = newScale;
 
-        // 首先检查是否有图元信息，如果有，重新计算最佳比例
-        let easypdfMarkerInfo = null;
-        if (isCadPDF) {
-          easypdfMarkerInfo = await findImagePrimitives(currentPage);
-        }
-
         const bestScale = localStorage.getItem("easyPdfBestScale");
         const isUserSavedBestScale =
           localStorage.getItem("easyPdfUserSavedBestScale") === "true";
         let finalScale = newScale; // 默认使用全屏显示比例
 
-        if (bestScale) {
+        // 首先检查是否有用户保存的最佳比例
+        if (bestScale && isUserSavedBestScale) {
           const savedBestScale = parseFloat(bestScale);
+          // 如果是用户保存的最佳比例，无论是否有图元信息，都使用用户保存的最佳比例
+          console.log(`使用用户保存的最佳比例: ${savedBestScale}`);
+          // 使用已保存的最佳比例
+          finalScale = savedBestScale;
 
-          // 规则1：如果读取了最佳比例（最佳比例不等于全屏显示比例），则最佳比例最高
-          // 规则3：如果计算所得最佳比例与用户自己识别的最佳比例不一致时，以用户识别最高
-          if (
-            Math.abs(savedBestScale - newScale) > 0.01 ||
-            isUserSavedBestScale
-          ) {
-            // 渲染最佳比例
-            const bestScaleViewport = currentPage.getViewport({
-              scale: savedBestScale * dpr,
-            });
-            tempOffscreenCanvas.width = bestScaleViewport.width;
-            tempOffscreenCanvas.height = bestScaleViewport.height;
-            await currentPage.render({
-              canvasContext: tempOffCtx,
-              viewport: bestScaleViewport,
-              background: isCadPDF ? "transparent" : "white",
-            }).promise;
-            // 暂存最佳比例的渲染结果
-            bestScaleRender = document.createElement("canvas");
-            bestScaleRender.width = tempOffscreenCanvas.width;
-            bestScaleRender.height = tempOffscreenCanvas.height;
-            const bestCtx = bestScaleRender.getContext("2d");
-            bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
-            console.log(`使用已保存的最佳比例: ${savedBestScale}`);
-            // 使用已保存的最佳比例
-            finalScale = savedBestScale;
+          // 渲染最佳比例
+          const bestScaleViewport = currentPage.getViewport({
+            scale: savedBestScale * dpr,
+          });
+          tempOffscreenCanvas.width = bestScaleViewport.width;
+          tempOffscreenCanvas.height = bestScaleViewport.height;
+          await currentPage.render({
+            canvasContext: tempOffCtx,
+            viewport: bestScaleViewport,
+            background: isCadPDF ? "transparent" : "white",
+          }).promise;
+          // 暂存最佳比例的渲染结果
+          bestScaleRender = document.createElement("canvas");
+          bestScaleRender.width = tempOffscreenCanvas.width;
+          bestScaleRender.height = tempOffscreenCanvas.height;
+          const bestCtx = bestScaleRender.getContext("2d");
+          bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+        } else {
+          // 没有用户保存的最佳比例，才尝试获取图元信息
+          // 使用全局的easypdfMarkerInfo变量
+          // 如果还没有图元信息，尝试获取
+          if (isCadPDF && !easypdfMarkerInfo) {
+            easypdfMarkerInfo = await findImagePrimitives(currentPage);
+          }
+
+          if (bestScale) {
+            const savedBestScale = parseFloat(bestScale);
+
+            // 规则1：如果读取了最佳比例（最佳比例不等于全屏显示比例），则最佳比例最高
+            if (Math.abs(savedBestScale - newScale) > 0.01) {
+              // 若读取的最佳比例不等于全局比例，则不计算图元计算比例
+              console.log(`使用已保存的最佳比例: ${savedBestScale}`);
+              // 使用已保存的最佳比例
+              finalScale = savedBestScale;
+
+              // 渲染最佳比例
+              const bestScaleViewport = currentPage.getViewport({
+                scale: savedBestScale * dpr,
+              });
+              tempOffscreenCanvas.width = bestScaleViewport.width;
+              tempOffscreenCanvas.height = bestScaleViewport.height;
+              await currentPage.render({
+                canvasContext: tempOffCtx,
+                viewport: bestScaleViewport,
+                background: isCadPDF ? "transparent" : "white",
+              }).promise;
+              // 暂存最佳比例的渲染结果
+              bestScaleRender = document.createElement("canvas");
+              bestScaleRender.width = tempOffscreenCanvas.width;
+              bestScaleRender.height = tempOffscreenCanvas.height;
+              const bestCtx = bestScaleRender.getContext("2d");
+              bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+            } else {
+              // 当读取的最佳比例等于全局比例时，查看是否有图元计算比例，若有则将图元计算比例保存为最佳比例
+              if (easypdfMarkerInfo && easypdfMarkerInfo.largestImage) {
+                // 实现pdf检测到图元信息时，图元的像素高度放大至坐标系y向粗线间的高度像素的比例即为最佳比例
+                const largestImage = easypdfMarkerInfo.largestImage;
+                const imageHeight = largestImage.bounds.height;
+
+                // 计算坐标系y向粗线间的高度像素（每4个基础单位）
+                const screenHeight = window.screen.height; // 使用屏幕分辨率
+                const totalDivisions = 29;
+                const baseUnit = screenHeight / totalDivisions;
+                const majorLineSpacing = baseUnit * 4;
+
+                // 计算最佳比例：将图元高度放大至粗线间距
+                // 注意：这里需要考虑PDF点到屏幕像素的转换
+                // 我们希望图元高度等于粗线间距，即：imageHeight * calculatedBestScale = majorLineSpacing
+                // 所以：calculatedBestScale = majorLineSpacing / imageHeight
+                console.log(`图元原始高度: ${imageHeight}`);
+                console.log(`粗线间距高度: ${majorLineSpacing}`);
+
+                // 计算需要的缩放因子，使得图元高度等于粗线间距
+                let baseScale = majorLineSpacing / imageHeight;
+                // 监测图元计算所得的比例乘4，为计算所得最佳比例
+                calculatedBestScale = baseScale * 4;
+                console.log(`根据图元计算基础比例: ${baseScale}`);
+                console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
+                // 使用计算出的最佳比例
+                finalScale = calculatedBestScale;
+
+                // 存储计算出的最佳比例（标记为系统计算，非用户保存）
+                localStorage.setItem(
+                  "easyPdfBestScale",
+                  calculatedBestScale.toString(),
+                );
+                localStorage.setItem("easyPdfUserSavedBestScale", "false");
+
+                // 渲染最佳比例
+                const bestScaleViewport = currentPage.getViewport({
+                  scale: calculatedBestScale * dpr,
+                });
+                tempOffscreenCanvas.width = bestScaleViewport.width;
+                tempOffscreenCanvas.height = bestScaleViewport.height;
+                await currentPage.render({
+                  canvasContext: tempOffCtx,
+                  viewport: bestScaleViewport,
+                  background: isCadPDF ? "transparent" : "white",
+                }).promise;
+
+                // 暂存最佳比例的渲染结果
+                bestScaleRender = document.createElement("canvas");
+                bestScaleRender.width = tempOffscreenCanvas.width;
+                bestScaleRender.height = tempOffscreenCanvas.height;
+                const bestCtx = bestScaleRender.getContext("2d");
+                bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+              } else {
+                // 没有图元信息，使用全屏显示比例
+                finalScale = newScale;
+              }
+            }
           } else {
-            // 规则2：如果最佳比例按钮等于全屏显示比例，且通过图元识别计算出最佳比例，则最佳比例更新并写入
+            // 没有最佳比例记录，使用全屏显示比例作为默认值
             if (easypdfMarkerInfo && easypdfMarkerInfo.largestImage) {
               // 实现pdf检测到图元信息时，图元的像素高度放大至坐标系y向粗线间的高度像素的比例即为最佳比例
               const largestImage = easypdfMarkerInfo.largestImage;
@@ -1314,89 +1398,37 @@
               console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
               // 使用计算出的最佳比例
               finalScale = calculatedBestScale;
+
+              // 存储计算出的最佳比例（标记为系统计算，非用户保存）
+              localStorage.setItem(
+                "easyPdfBestScale",
+                calculatedBestScale.toString(),
+              );
+              localStorage.setItem("easyPdfUserSavedBestScale", "false");
+
+              // 渲染最佳比例
+              const bestScaleViewport = currentPage.getViewport({
+                scale: calculatedBestScale * dpr,
+              });
+              tempOffscreenCanvas.width = bestScaleViewport.width;
+              tempOffscreenCanvas.height = bestScaleViewport.height;
+              await currentPage.render({
+                canvasContext: tempOffCtx,
+                viewport: bestScaleViewport,
+                background: isCadPDF ? "transparent" : "white",
+              }).promise;
+
+              // 暂存最佳比例的渲染结果
+              bestScaleRender = document.createElement("canvas");
+              bestScaleRender.width = tempOffscreenCanvas.width;
+              bestScaleRender.height = tempOffscreenCanvas.height;
+              const bestCtx = bestScaleRender.getContext("2d");
+              bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+            } else {
+              // 没有图元信息，使用全屏显示比例
+              finalScale = newScale;
             }
-
-            // 存储计算出的最佳比例（标记为系统计算，非用户保存）
-            localStorage.setItem(
-              "easyPdfBestScale",
-              calculatedBestScale.toString(),
-            );
-            localStorage.setItem("easyPdfUserSavedBestScale", "false");
-
-            // 渲染最佳比例
-            const bestScaleViewport = currentPage.getViewport({
-              scale: calculatedBestScale * dpr,
-            });
-            tempOffscreenCanvas.width = bestScaleViewport.width;
-            tempOffscreenCanvas.height = bestScaleViewport.height;
-            await currentPage.render({
-              canvasContext: tempOffCtx,
-              viewport: bestScaleViewport,
-              background: isCadPDF ? "transparent" : "white",
-            }).promise;
-
-            // 暂存最佳比例的渲染结果
-            bestScaleRender = document.createElement("canvas");
-            bestScaleRender.width = tempOffscreenCanvas.width;
-            bestScaleRender.height = tempOffscreenCanvas.height;
-            const bestCtx = bestScaleRender.getContext("2d");
-            bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
           }
-        } else {
-          // 没有最佳比例记录，使用全屏显示比例作为默认值
-          if (easypdfMarkerInfo && easypdfMarkerInfo.largestImage) {
-            // 实现pdf检测到图元信息时，图元的像素高度放大至坐标系y向粗线间的高度像素的比例即为最佳比例
-            const largestImage = easypdfMarkerInfo.largestImage;
-            const imageHeight = largestImage.bounds.height;
-
-            // 计算坐标系y向粗线间的高度像素（每4个基础单位）
-            const screenHeight = window.screen.height; // 使用屏幕分辨率
-            const totalDivisions = 29;
-            const baseUnit = screenHeight / totalDivisions;
-            const majorLineSpacing = baseUnit * 4;
-
-            // 计算最佳比例：将图元高度放大至粗线间距
-            // 注意：这里需要考虑PDF点到屏幕像素的转换
-            // 我们希望图元高度等于粗线间距，即：imageHeight * calculatedBestScale = majorLineSpacing
-            // 所以：calculatedBestScale = majorLineSpacing / imageHeight
-            console.log(`图元原始高度: ${imageHeight}`);
-            console.log(`粗线间距高度: ${majorLineSpacing}`);
-
-            // 计算需要的缩放因子，使得图元高度等于粗线间距
-            let baseScale = majorLineSpacing / imageHeight;
-            // 监测图元计算所得的比例乘4，为计算所得最佳比例
-            calculatedBestScale = baseScale * 4;
-            console.log(`根据图元计算基础比例: ${baseScale}`);
-            console.log(`乘以4后的最佳比例: ${calculatedBestScale}`);
-            // 使用计算出的最佳比例
-            finalScale = calculatedBestScale;
-          }
-
-          // 存储计算出的最佳比例（标记为系统计算，非用户保存）
-          localStorage.setItem(
-            "easyPdfBestScale",
-            calculatedBestScale.toString(),
-          );
-          localStorage.setItem("easyPdfUserSavedBestScale", "false");
-
-          // 渲染最佳比例
-          const bestScaleViewport = currentPage.getViewport({
-            scale: calculatedBestScale * dpr,
-          });
-          tempOffscreenCanvas.width = bestScaleViewport.width;
-          tempOffscreenCanvas.height = bestScaleViewport.height;
-          await currentPage.render({
-            canvasContext: tempOffCtx,
-            viewport: bestScaleViewport,
-            background: isCadPDF ? "transparent" : "white",
-          }).promise;
-
-          // 暂存最佳比例的渲染结果
-          bestScaleRender = document.createElement("canvas");
-          bestScaleRender.width = tempOffscreenCanvas.width;
-          bestScaleRender.height = tempOffscreenCanvas.height;
-          const bestCtx = bestScaleRender.getContext("2d");
-          bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
         }
 
         // 设置为最终确定的比例
@@ -1451,8 +1483,10 @@
           bestScaleRender = null;
           isCadPDF = false; // 重置CAD PDF检测结果
           easypdfMarkerInfo = null; // 重置EasyPDF标记信息
-          // 清除本地存储中的最佳比例，确保新文件使用正确的默认值
-          localStorage.removeItem("easyPdfBestScale");
+          // 只有从历史记录加载文件时才清除最佳比例，否则保留用户保存的最佳比例
+          if (isLoadingFromHistory) {
+            localStorage.removeItem("easyPdfBestScale");
+          }
 
           // 重置最佳比例按钮状态
           initBestScaleButton();
@@ -2214,6 +2248,39 @@
       // 网格系统状态
       let gridVisible = false; // 网格是否可见
 
+      // 切换坐标系显示/隐藏
+      function toggleCoordinateSystem() {
+        const gridContainer = document.getElementById("grid-container");
+        if (gridContainer) {
+          // 切换网格可见性
+          gridVisible = !gridVisible;
+
+          // 添加动画效果，动画时间0.1秒
+          gridContainer.style.transition = "opacity 0.1s ease";
+
+          if (gridVisible) {
+            // 显示网格
+            gridContainer.style.opacity = "0";
+            gridContainer.style.display = "block";
+            // 重新创建网格以确保正确的布局
+            createGridSystem();
+            // 触发重排
+            void gridContainer.offsetWidth;
+            // 设置透明度为1
+            gridContainer.style.opacity = "1";
+            console.log("坐标系已打开");
+          } else {
+            // 隐藏网格
+            gridContainer.style.opacity = "0";
+            // 动画结束后完全隐藏
+            setTimeout(() => {
+              gridContainer.style.display = "none";
+            }, 100);
+            console.log("坐标系已关闭");
+          }
+        }
+      }
+
       // 初始化网格系统
       function initGridSystem() {
         console.log("开始初始化网格系统");
@@ -2226,7 +2293,11 @@
         }
 
         // 监听窗口大小变化，自适应调整网格
-        window.addEventListener("resize", createGridSystem);
+        window.addEventListener("resize", () => {
+          if (gridVisible) {
+            createGridSystem();
+          }
+        });
 
         console.log("网格系统初始化完成");
       }
@@ -2344,42 +2415,12 @@
 
         // 控制提示显示
         if (locked) {
-          // 锁定状态：显示提示，5秒后淡出
-          if (canvasInstruction) {
-            canvasInstruction.style.display = "block";
-            canvasInstruction.style.opacity = "1";
-            // 清除之前的定时器
-            if (instructionTimeout) {
-              clearTimeout(instructionTimeout);
-            }
-            // 5秒后淡出
-            instructionTimeout = setTimeout(() => {
-              canvasInstruction.style.opacity = "0";
-              setTimeout(() => {
-                canvasInstruction.style.display = "none";
-              }, 300);
-            }, 5000);
-          }
           wasFullscreenBeforeLock = !!document.fullscreenElement;
           if (!wasFullscreenBeforeLock) toggleFullscreen();
           app.classList.add("locked-mode");
           lockBtnEl.classList.add("locked");
-
-          // 锁定状态下显示网格
-          const gridContainer = document.getElementById("grid-container");
-          if (gridContainer) {
-            gridVisible = true;
-            gridContainer.style.display = "block";
-            console.log("锁定状态：网格开启");
-          }
+          console.log("进入锁定模式：双击屏幕可打开/关闭坐标系");
         } else {
-          // 解锁状态：隐藏提示
-          if (canvasInstruction) {
-            canvasInstruction.style.display = "none";
-          }
-          if (instructionTimeout) {
-            clearTimeout(instructionTimeout);
-          }
           if (document.fullscreenElement && !wasFullscreenBeforeLock) {
             toggleFullscreen();
           } else if (!document.fullscreenElement && wasFullscreenBeforeLock) {
@@ -2702,15 +2743,14 @@
         canvas.addEventListener("touchend", onTouchEnd);
 
         // 双击锁定/解锁
+        // 双击屏幕打开/关闭坐标系（仅在锁定模式下）
         canvas.addEventListener("dblclick", () => {
-          if (!isLoggedIn) {
-            showLoginOverlay();
-            return;
+          if (locked) {
+            toggleCoordinateSystem();
           }
-          toggleLock();
         });
 
-        // 触屏双击检测
+        // 触屏双击检测（仅在锁定模式下打开/关闭坐标系）
         let lastTouchTime = 0;
         const DOUBLE_TAP_DELAY = 300; // 双击延迟阈值（毫秒）
         canvas.addEventListener("touchstart", (e) => {
@@ -2720,13 +2760,10 @@
           if (tapLength === 1) {
             if (currentTime - lastTouchTime < DOUBLE_TAP_DELAY) {
               // 检测到双击
-              if (!isLoggedIn) {
-                showLoginOverlay();
+              if (locked) {
+                toggleCoordinateSystem();
                 e.preventDefault();
-                return;
               }
-              toggleLock();
-              e.preventDefault();
             }
             lastTouchTime = currentTime;
           }
@@ -2862,7 +2899,7 @@
             await currentPage.render({
               canvasContext: tempOffCtx,
               viewport: bestScaleViewport,
-              background: "white",
+              background: isCadPDF ? "transparent" : "white",
             }).promise;
             // 更新最佳比例的暂存渲染结果
             bestScaleRender = document.createElement("canvas");
@@ -3287,56 +3324,59 @@
 
               // 使用不同的渲染策略
               if (animationType === "fullToBest") {
-                // 当由全屏显示比例到最佳比例，由全屏显示比例放大后最后一帧切换为最佳比例
-                if (progress < 1) {
-                  // 动画过程中使用全内容显示的渲染结果放大
-                  if (fullContentRender) {
-                    try {
-                      const currentRenderScale =
-                        currentScale / contentVisibleScale;
-                      const fullWidth =
-                        fullContentRender.width * currentRenderScale;
-                      const fullHeight =
-                        fullContentRender.height * currentRenderScale;
+                // 当由全屏显示比例到最佳比例，由全屏显示比例放大后平滑过渡到最佳比例
+                if (fullContentRender) {
+                  try {
+                    const currentRenderScale =
+                      currentScale / contentVisibleScale;
+                    const fullWidth =
+                      fullContentRender.width * currentRenderScale;
+                    const fullHeight =
+                      fullContentRender.height * currentRenderScale;
 
-                      // 计算绘制位置（以屏幕中心为锚点）
-                      const drawX = centerX - fullWidth / 2;
-                      const drawY = centerY - fullHeight / 2;
+                    // 计算绘制位置（以屏幕中心为锚点）
+                    const drawX = centerX - fullWidth / 2;
+                    const drawY = centerY - fullHeight / 2;
 
-                      // 绘制缩放后的内容
-                      ctx.drawImage(
-                        fullContentRender,
-                        drawX,
-                        drawY,
-                        fullWidth,
-                        fullHeight,
-                      );
-                    } catch (e) {
-                      console.error("动画渲染失败", e);
-                    }
+                    // 绘制缩放后的内容
+                    ctx.drawImage(
+                      fullContentRender,
+                      drawX,
+                      drawY,
+                      fullWidth,
+                      fullHeight,
+                    );
+                  } catch (e) {
+                    console.error("动画渲染失败", e);
                   }
-                } else {
-                  // 最后一帧切换为最佳比例渲染结果
-                  if (bestScaleRender) {
-                    try {
-                      const bestWidth = bestScaleRender.width;
-                      const bestHeight = bestScaleRender.height;
+                }
+                // 最后阶段平滑过渡到最佳比例渲染结果
+                if (progress > 0.8 && bestScaleRender) {
+                  try {
+                    // 计算透明度，从0逐渐增加到1
+                    const alpha = (progress - 0.8) / 0.2;
+                    ctx.globalAlpha = alpha;
 
-                      // 计算绘制位置（以屏幕中心为锚点）
-                      const drawX = centerX - bestWidth / 2;
-                      const drawY = centerY - bestHeight / 2;
+                    const bestWidth = bestScaleRender.width;
+                    const bestHeight = bestScaleRender.height;
 
-                      // 绘制最佳比例的内容
-                      ctx.drawImage(
-                        bestScaleRender,
-                        drawX,
-                        drawY,
-                        bestWidth,
-                        bestHeight,
-                      );
-                    } catch (e) {
-                      console.error("动画渲染失败", e);
-                    }
+                    // 计算绘制位置（以屏幕中心为锚点）
+                    const drawX = centerX - bestWidth / 2;
+                    const drawY = centerY - bestHeight / 2;
+
+                    // 绘制最佳比例的内容
+                    ctx.drawImage(
+                      bestScaleRender,
+                      drawX,
+                      drawY,
+                      bestWidth,
+                      bestHeight,
+                    );
+
+                    // 重置透明度
+                    ctx.globalAlpha = 1;
+                  } catch (e) {
+                    console.error("动画渲染失败", e);
                   }
                 }
               } else if (animationType === "bestToFull") {
@@ -3370,56 +3410,59 @@
                   }
                 }
               } else if (animationType === "anyToBest") {
-                // 当由任意比例到最佳比例，第一帧为全屏显示放大结果（放大结果相对位置与原比例保持一致），开始缩放至最佳比例，最后一帧切换为最佳比例
-                if (progress < 1) {
-                  // 动画过程中使用全内容显示的渲染结果放大
-                  if (fullContentRender) {
-                    try {
-                      const currentRenderScale =
-                        currentScale / contentVisibleScale;
-                      const fullWidth =
-                        fullContentRender.width * currentRenderScale;
-                      const fullHeight =
-                        fullContentRender.height * currentRenderScale;
+                // 当由任意比例到最佳比例，第一帧为全屏显示放大结果，开始缩放至最佳比例，最后平滑过渡到最佳比例
+                if (fullContentRender) {
+                  try {
+                    const currentRenderScale =
+                      currentScale / contentVisibleScale;
+                    const fullWidth =
+                      fullContentRender.width * currentRenderScale;
+                    const fullHeight =
+                      fullContentRender.height * currentRenderScale;
 
-                      // 计算绘制位置（以屏幕中心为锚点）
-                      const drawX = centerX - fullWidth / 2;
-                      const drawY = centerY - fullHeight / 2;
+                    // 计算绘制位置（以屏幕中心为锚点）
+                    const drawX = centerX - fullWidth / 2;
+                    const drawY = centerY - fullHeight / 2;
 
-                      // 绘制缩放后的内容
-                      ctx.drawImage(
-                        fullContentRender,
-                        drawX,
-                        drawY,
-                        fullWidth,
-                        fullHeight,
-                      );
-                    } catch (e) {
-                      console.error("动画渲染失败", e);
-                    }
+                    // 绘制缩放后的内容
+                    ctx.drawImage(
+                      fullContentRender,
+                      drawX,
+                      drawY,
+                      fullWidth,
+                      fullHeight,
+                    );
+                  } catch (e) {
+                    console.error("动画渲染失败", e);
                   }
-                } else {
-                  // 最后一帧切换为最佳比例渲染结果
-                  if (bestScaleRender) {
-                    try {
-                      const bestWidth = bestScaleRender.width;
-                      const bestHeight = bestScaleRender.height;
+                }
+                // 最后阶段平滑过渡到最佳比例渲染结果
+                if (progress > 0.8 && bestScaleRender) {
+                  try {
+                    // 计算透明度，从0逐渐增加到1
+                    const alpha = (progress - 0.8) / 0.2;
+                    ctx.globalAlpha = alpha;
 
-                      // 计算绘制位置（以屏幕中心为锚点）
-                      const drawX = centerX - bestWidth / 2;
-                      const drawY = centerY - bestHeight / 2;
+                    const bestWidth = bestScaleRender.width;
+                    const bestHeight = bestScaleRender.height;
 
-                      // 绘制最佳比例的内容
-                      ctx.drawImage(
-                        bestScaleRender,
-                        drawX,
-                        drawY,
-                        bestWidth,
-                        bestHeight,
-                      );
-                    } catch (e) {
-                      console.error("动画渲染失败", e);
-                    }
+                    // 计算绘制位置（以屏幕中心为锚点）
+                    const drawX = centerX - bestWidth / 2;
+                    const drawY = centerY - bestHeight / 2;
+
+                    // 绘制最佳比例的内容
+                    ctx.drawImage(
+                      bestScaleRender,
+                      drawX,
+                      drawY,
+                      bestWidth,
+                      bestHeight,
+                    );
+
+                    // 重置透明度
+                    ctx.globalAlpha = 1;
+                  } catch (e) {
+                    console.error("动画渲染失败", e);
                   }
                 }
               } else {
