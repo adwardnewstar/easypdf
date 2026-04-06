@@ -484,9 +484,12 @@
       /* 锁定模式隐藏除锁定按钮外的所有控件 */
       .locked-mode .top-bar,
       .locked-mode .thumb-card,
-      .locked-mode .history-menu,
-      .locked-mode #thumbCard {
+      .locked-mode .history-menu {
         display: none !important;
+      }
+      .locked-mode #thumbCard {
+        display: flex !important;
+        opacity: 0.5;
       }
       .locked-mode {
         cursor: default;
@@ -2193,8 +2196,6 @@
 
       // 网格系统状态
       let gridVisible = false; // 网格是否可见
-      let longPressTimer = null; // 长按定时器
-      const LONG_PRESS_DURATION = 500; // 长按持续时间（毫秒）
 
       // 初始化网格系统
       function initGridSystem() {
@@ -2210,49 +2211,7 @@
         // 监听窗口大小变化，自适应调整网格
         window.addEventListener("resize", createGridSystem);
 
-        // 监听鼠标按下事件，用于检测长按
-        window.addEventListener("mousedown", handleMouseDown);
-        // 监听鼠标释放事件，用于取消长按
-        window.addEventListener("mouseup", handleMouseUp);
-        // 监听鼠标离开事件，用于取消长按
-        window.addEventListener("mouseleave", handleMouseUp);
-
         console.log("网格系统初始化完成");
-      }
-
-      // 处理鼠标按下事件
-      function handleMouseDown(e) {
-        // 只有在锁定状态下，且按下的是左键时才处理
-        if (locked && e.button === 0) {
-          // 清除之前的定时器
-          if (longPressTimer) {
-            clearTimeout(longPressTimer);
-          }
-          // 设置新的定时器
-          longPressTimer = setTimeout(() => {
-            // 长按触发，切换网格可见性
-            toggleGridVisibility();
-          }, LONG_PRESS_DURATION);
-        }
-      }
-
-      // 处理鼠标释放事件
-      function handleMouseUp() {
-        // 清除定时器
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
-      }
-
-      // 切换网格可见性
-      function toggleGridVisibility() {
-        const gridContainer = document.getElementById("grid-container");
-        if (gridContainer) {
-          gridVisible = !gridVisible;
-          gridContainer.style.display = gridVisible ? "block" : "none";
-          console.log(`网格${gridVisible ? "开启" : "关闭"}`);
-        }
       }
 
       // 调用初始化函数
@@ -2388,6 +2347,14 @@
           if (!wasFullscreenBeforeLock) toggleFullscreen();
           app.classList.add("locked-mode");
           lockBtnEl.classList.add("locked");
+
+          // 锁定状态下显示网格
+          const gridContainer = document.getElementById("grid-container");
+          if (gridContainer) {
+            gridVisible = true;
+            gridContainer.style.display = "block";
+            console.log("锁定状态：网格开启");
+          }
         } else {
           // 解锁状态：隐藏提示
           if (canvasInstruction) {
@@ -2403,6 +2370,14 @@
           }
           app.classList.remove("locked-mode");
           lockBtnEl.classList.remove("locked");
+
+          // 解锁状态下隐藏网格
+          const gridContainer = document.getElementById("grid-container");
+          if (gridContainer) {
+            gridVisible = false;
+            gridContainer.style.display = "none";
+            console.log("解锁状态：网格关闭");
+          }
         }
       }
 
