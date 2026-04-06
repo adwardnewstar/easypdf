@@ -2143,7 +2143,8 @@
       // ==================== 画布交互 ====================
       function onMouseDown(e) {
         if (!offscreenCanvas) return;
-        e.preventDefault();
+        // 不要阻止默认行为，否则会影响双击事件
+        // e.preventDefault();
         isDragging = true;
         dragStartX = e.clientX * dpr;
         dragStartY = e.clientY * dpr;
