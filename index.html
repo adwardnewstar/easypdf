@@ -731,8 +731,8 @@
         position: fixed;
         top: 100px; /* 位于工具栏目下方 */
         left: 20px; /* 距离屏幕左边的距离 */
-        height: calc(100vh / 7); /* 高度固定为屏幕高度的1/7 */
-        width: calc(100vh / 7 * 1.5); /* 宽度为高度的1.5倍，保持1:1.5的比例 */
+        height: 14.2857vh; /* 高度固定为屏幕高度的1/7（100/7≈14.2857） */
+        width: 21.4286vh; /* 宽度为高度的1.5倍，保持1:1.5的比例 */
         background: rgba(30, 30, 38, 0.9);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1830,7 +1830,7 @@
         isNavVisible = !isNavVisible;
         if (isNavVisible) {
           // 计算导航视口位置，确保距离工具栏的距离是响应式的
-          const toolbar = document.querySelector(".toolbar");
+          const toolbar = document.querySelector(".top-bar");
           const toolbarHeight = toolbar ? toolbar.offsetHeight : 100;
           const margin = 20; // 边距值，确保上边缘距离工具栏下边缘的距离与左边缘距离屏幕左边的距离相等
           viewportNav.style.top = `${toolbarHeight + margin}px`;
@@ -1975,7 +1975,7 @@
       window.addEventListener("resize", () => {
         if (isNavVisible) {
           // 计算导航视口位置，确保距离工具栏的距离是响应式的
-          const toolbar = document.querySelector(".toolbar");
+          const toolbar = document.querySelector(".top-bar");
           const toolbarHeight = toolbar ? toolbar.offsetHeight : 100;
           const margin = 20; // 边距值，确保上边缘距离工具栏下边缘的距离与左边缘距离屏幕左边的距离相等
           viewportNav.style.top = `${toolbarHeight + margin}px`;
