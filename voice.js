@@ -30,43 +30,111 @@ function showLoading(show, msg = '加载中...') {
 // 语音识别功能
 function initVoiceRecognition() {
   const speechBtn = document.getElementById('thumbCard');
+  const viewportNav = document.getElementById('viewportNav');
   let recognition = null;
+  let longPressTimer = null;
+  let isListening = false;
   
   console.log('初始化语音识别...');
   
-  // 检查浏览器支持
-  if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    console.log('语音识别初始化成功');
-    
-    recognition.onresult = async (event) => {
-      const transcript = event.results[0][0].transcript;
-      console.log('语音输入:', transcript);
-      await processVoiceCommand(transcript);
-    };
-    
-    recognition.onerror = (event) => {
-      console.error('语音识别错误:', event.error);
-      showToast('语音识别失败，请重试');
-    };
-    
-    speechBtn.addEventListener('click', () => {
-      try {
-        console.log('开始语音识别...');
-        recognition.start();
-        showToast('请说出您的指令...');
-      } catch (error) {
-        console.error('启动语音识别失败:', error);
-        showToast('无法启动语音识别');
+  // 初始化语音识别实例
+  function initRecognition() {
+    if (!recognition) {
+      if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'zh-CN';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onresult = async (event) => {
+          const transcript = event.results[0][0].transcript;
+          console.log('语音输入:', transcript);
+          isListening = false;
+          await processVoiceCommand(transcript);
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('语音识别错误:', event.error);
+          isListening = false;
+          showToast('语音识别失败，请重试');
+        };
+        
+        recognition.onend = () => {
+          isListening = false;
+        };
+        
+        console.log('语音识别初始化成功');
+      } else {
+        console.error('浏览器不支持语音识别');
+        showToast('您的浏览器不支持语音识别');
       }
-    });
-  } else {
-    console.error('浏览器不支持语音识别');
-    showToast('您的浏览器不支持语音识别');
+    }
   }
+  
+  // 长按处理
+  speechBtn.addEventListener('mousedown', () => {
+    longPressTimer = setTimeout(() => {
+      if (!isListening) {
+        initRecognition();
+        if (recognition) {
+          try {
+            console.log('开始语音识别...');
+            recognition.start();
+            isListening = true;
+            showToast('请说出您的指令...');
+          } catch (error) {
+            console.error('启动语音识别失败:', error);
+            showToast('无法启动语音识别');
+          }
+        }
+      }
+    }, 500); // 500毫秒长按触发
+  });
+  
+  // 鼠标释放处理
+  speechBtn.addEventListener('mouseup', () => {
+    clearTimeout(longPressTimer);
+  });
+  
+  // 鼠标离开处理
+  speechBtn.addEventListener('mouseleave', () => {
+    clearTimeout(longPressTimer);
+  });
+  
+  // 触摸设备支持
+  speechBtn.addEventListener('touchstart', () => {
+    longPressTimer = setTimeout(() => {
+      if (!isListening) {
+        initRecognition();
+        if (recognition) {
+          try {
+            console.log('开始语音识别...');
+            recognition.start();
+            isListening = true;
+            showToast('请说出您的指令...');
+          } catch (error) {
+            console.error('启动语音识别失败:', error);
+            showToast('无法启动语音识别');
+          }
+        }
+      }
+    }, 500);
+  });
+  
+  speechBtn.addEventListener('touchend', () => {
+    clearTimeout(longPressTimer);
+  });
+  
+  // 单击处理：切换导航窗口
+  speechBtn.addEventListener('click', () => {
+    if (viewportNav) {
+      if (viewportNav.style.display === 'none' || viewportNav.style.display === '') {
+        viewportNav.style.display = 'block';
+      } else {
+        viewportNav.style.display = 'none';
+      }
+    }
+  });
 }
 
 // 处理语音指令
@@ -85,6 +153,10 @@ async function processVoiceCommand(transcript) {
         html: document.documentElement.outerHTML
       })
     });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
     const result = await response.json();
     
