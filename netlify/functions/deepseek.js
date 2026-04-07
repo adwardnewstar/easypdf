@@ -1,6 +1,14 @@
 exports.handler = async (event, context) => {
   try {
-    const { transcript, html } = JSON.parse(event.body);
+    const { transcript, html, isCacheValid } = JSON.parse(event.body);
+    
+    // 构建用户消息内容
+    let userContent = `用户指令: ${transcript}`;
+    
+    // 只有当缓存无效时才包含HTML结构
+    if (!isCacheValid && html) {
+      userContent += `\n            HTML结构: ${html.substring(0, 5000)}`;
+    }
     
     // 调用DeepSeek API
     const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -33,8 +41,7 @@ exports.handler = async (event, context) => {
           },
           {
             role: 'user',
-            content: `用户指令: ${transcript}
-            HTML结构: ${html.substring(0, 5000)}`
+            content: userContent
           }
         ],
         temperature: 0.3
