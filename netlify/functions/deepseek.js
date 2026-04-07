@@ -1,6 +1,6 @@
 exports.handler = async (event, context) => {
   try {
-    const { transcript, html, isCacheValid } = JSON.parse(event.body);
+    const { transcript, html, isCacheValid, history } = JSON.parse(event.body);
     
     // 构建用户消息内容
     let userContent = `用户指令: ${transcript}`;
@@ -8,6 +8,11 @@ exports.handler = async (event, context) => {
     // 只有当缓存无效时才包含HTML结构
     if (!isCacheValid && html) {
       userContent += `\n            HTML结构: ${html.substring(0, 5000)}`;
+    }
+    
+    // 如果有历史记录，添加到用户消息中
+    if (history && history.length > 0) {
+      userContent += `\n            历史记录: ${JSON.stringify(history)}`;
     }
     
     // 调用DeepSeek API
@@ -30,12 +35,19 @@ exports.handler = async (event, context) => {
             - reset: 重置视图
             - fullscreen: 全屏
             - history: 历史记录
+            - openHistory: 打开历史记录中的文件（需要指定文件索引或名称）
             
             请返回JSON格式的指令，例如：
             {
               "command": {
                 "type": "zoom",
                 "action": "in"
+              }
+            }
+            {
+              "command": {
+                "type": "openHistory",
+                "index": 0
               }
             }`
           },
