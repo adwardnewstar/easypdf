@@ -1790,8 +1790,15 @@
 
         isNavVisible = !isNavVisible;
         if (isNavVisible) {
+          // 计算导航视口位置，确保距离工具栏的距离是响应式的
+          const toolbar = document.querySelector(".toolbar");
+          const toolbarHeight = toolbar ? toolbar.offsetHeight : 100;
+          viewportNav.style.top = `${toolbarHeight + 20}px`;
+          viewportNav.style.left = "20px";
           viewportNav.style.display = "block";
           updateViewportNav();
+          // 设置长按触发标志，防止点击事件立即隐藏导航窗口
+          isLongPressTriggered = true;
         } else {
           viewportNav.style.display = "none";
         }
@@ -1819,6 +1826,52 @@
       document.addEventListener("mouseup", () => {
         isDraggingNav = false;
         document.body.style.userSelect = "";
+      });
+
+      // 导航窗口焦点取消功能
+      let isLongPressTriggered = false; // 是否是长按触发的导航窗口
+
+      // 导航窗口双击放大切换效果
+      let isNavEnlarged = false; // 导航窗口是否已放大
+      let navOriginalWidth = 0; // 导航窗口原始宽度
+      let navOriginalHeight = 0; // 导航窗口原始高度
+
+      navContent.addEventListener("dblclick", (e) => {
+        e.stopPropagation(); // 阻止事件冒泡
+
+        const rect = viewportNav.getBoundingClientRect();
+
+        if (!isNavEnlarged) {
+          // 保存原始尺寸
+          navOriginalWidth = rect.width;
+          navOriginalHeight = rect.height;
+
+          // 放大为原尺寸的两倍，以左上角为固定中心点
+          viewportNav.style.width = `${navOriginalWidth * 2}px`;
+          viewportNav.style.height = `${navOriginalHeight * 2}px`;
+        } else {
+          // 恢复原始尺寸
+          viewportNav.style.width = `${navOriginalWidth}px`;
+          viewportNav.style.height = `${navOriginalHeight}px`;
+        }
+
+        // 切换放大状态
+        isNavEnlarged = !isNavEnlarged;
+
+        // 更新导航窗口内容
+        updateViewportNav();
+      });
+
+      // 窗口大小变化时调整导航视口位置
+      window.addEventListener("resize", () => {
+        if (isNavVisible) {
+          // 计算导航视口位置，确保距离工具栏的距离是响应式的
+          const toolbar = document.querySelector(".toolbar");
+          const toolbarHeight = toolbar ? toolbar.offsetHeight : 100;
+          viewportNav.style.top = `${toolbarHeight + 20}px`;
+          // 更新导航窗口内容
+          updateViewportNav();
+        }
       });
 
       // 更新视口导航窗口
@@ -1865,59 +1918,8 @@
 
       // 更新视口指示器
       function updateViewportIndicator() {
-        if (!currentPage || !navContent || !fullContentRender) return;
-
-        const navRect = navContent.getBoundingClientRect();
-        const navWidth = navRect.width;
-        const navHeight = navRect.height;
-
-        // 计算视口在导航窗口中的位置
-        const viewport = currentPage.getViewport({ scale: 1 });
-
-        // 计算导航窗口的缩放比例，保持原始比例
-        const scaleX = navWidth / fullContentRender.width;
-        const scaleY = navHeight / fullContentRender.height;
-        const renderScale = Math.min(scaleX, scaleY);
-
-        // 计算渲染位置，居中显示
-        const renderWidth = fullContentRender.width * renderScale;
-        const renderHeight = fullContentRender.height * renderScale;
-        const renderX = (navWidth - renderWidth) / 2;
-        const renderY = (navHeight - renderHeight) / 2;
-
-        // 计算全显比例
-        const rect = canvasArea.getBoundingClientRect();
-        let canvasW = rect.width || window.innerWidth;
-        let canvasH = rect.height || window.innerHeight;
-        canvasW = canvasW * dpr;
-        canvasH = canvasH * dpr;
-        const imgW = viewport.width * dpr;
-        const imgH = viewport.height * dpr;
-        const fullScale = Math.min(canvasW / imgW, canvasH / imgH);
-
-        // 计算主视图中心点在PDF中的坐标
-        const mainViewCenterX = (canvas.width / 2 - offsetX / dpr) / scale;
-        const mainViewCenterY = (canvas.height / 2 - offsetY / dpr) / scale;
-
-        // 计算中心点在全显渲染结果中的位置
-        const fullRenderCenterX = mainViewCenterX * fullScale * dpr;
-        const fullRenderCenterY = mainViewCenterY * fullScale * dpr;
-
-        // 计算中心点在导航窗口中的位置
-        const centerX =
-          (fullRenderCenterX / fullContentRender.width) * renderWidth + renderX;
-        const centerY =
-          (fullRenderCenterY / fullContentRender.height) * renderHeight +
-          renderY;
-
-        // 设置视口指示器的样式（固定大小的中心点指示器）
-        viewportIndicator.style.width = "10px";
-        viewportIndicator.style.height = "10px";
-        viewportIndicator.style.left = `${centerX - 5}px`;
-        viewportIndicator.style.top = `${centerY - 5}px`;
-        viewportIndicator.style.borderRadius = "50%";
-        viewportIndicator.style.backgroundColor = "rgba(255, 165, 0, 0.7)";
-        viewportIndicator.style.border = "2px solid white";
+        // 取消导航视口焦点显示
+        viewportIndicator.style.display = "none";
       }
 
       // 导航窗口点击导航功能
