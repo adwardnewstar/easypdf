@@ -730,7 +730,7 @@
       .viewport-nav {
         position: fixed;
         top: 100px; /* 位于工具栏目下方 */
-        left: 20px;
+        left: 20px; /* 距离屏幕左边的距离 */
         height: calc(100vh / 7); /* 高度固定为屏幕高度的1/7 */
         width: calc(100vh / 7 * 1.5); /* 宽度为高度的1.5倍，保持1:1.5的比例 */
         background: rgba(30, 30, 38, 0.9);
@@ -1881,18 +1881,27 @@
       navContent.addEventListener("touchstart", (e) => {
         e.preventDefault();
         const touch = e.touches[0];
-        // 单击后立即进入拖动状态
-        isDraggingNav = true;
-        navDragStartX = touch.clientX;
-        navDragStartY = touch.clientY;
-        const rect = viewportNav.getBoundingClientRect();
-        navStartX = rect.left;
-        navStartY = rect.top;
-        // 保存触摸起始位置
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        // 添加拖动视觉反馈
-        viewportNav.classList.add("long-press");
+        const currentTime = new Date().getTime();
+        const touchTime = currentTime - lastTouchTime;
+        if (touchTime < 300 && touchTime > 0) {
+          // 双击，不进入拖动状态
+          handleNavDoubleClick();
+          lastTouchTime = 0; // 重置，避免连续触发
+        } else {
+          // 单击，进入拖动状态
+          isDraggingNav = true;
+          navDragStartX = touch.clientX;
+          navDragStartY = touch.clientY;
+          const rect = viewportNav.getBoundingClientRect();
+          navStartX = rect.left;
+          navStartY = rect.top;
+          // 保存触摸起始位置
+          touchStartX = touch.clientX;
+          touchStartY = touch.clientY;
+          // 添加拖动视觉反馈
+          viewportNav.classList.add("long-press");
+          lastTouchTime = currentTime;
+        }
       });
 
       document.addEventListener("touchmove", (e) => {
