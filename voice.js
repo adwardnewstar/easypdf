@@ -1,7 +1,38 @@
+// 显示提示信息
+function showToast(message) {
+  // 创建提示元素
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  
+  // 添加到页面
+  document.body.appendChild(toast);
+  
+  // 2秒后自动移除
+  setTimeout(() => {
+    toast.remove();
+  }, 2000);
+}
+
+// 显示加载状态
+function showLoading(show, msg = '加载中...') {
+  const loadingMask = document.getElementById('loadingMask');
+  if (loadingMask) {
+    if (show) {
+      loadingMask.textContent = msg;
+      loadingMask.style.display = 'flex';
+    } else {
+      loadingMask.style.display = 'none';
+    }
+  }
+}
+
 // 语音识别功能
 function initVoiceRecognition() {
   const speechBtn = document.getElementById('thumbCard');
   let recognition = null;
+  
+  console.log('初始化语音识别...');
   
   // 检查浏览器支持
   if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -9,6 +40,7 @@ function initVoiceRecognition() {
     recognition.lang = 'zh-CN';
     recognition.continuous = false;
     recognition.interimResults = false;
+    console.log('语音识别初始化成功');
     
     recognition.onresult = async (event) => {
       const transcript = event.results[0][0].transcript;
@@ -23,6 +55,7 @@ function initVoiceRecognition() {
     
     speechBtn.addEventListener('click', () => {
       try {
+        console.log('开始语音识别...');
         recognition.start();
         showToast('请说出您的指令...');
       } catch (error) {
@@ -76,11 +109,25 @@ function executeCommand(command) {
       break;
     case 'zoom':
       if (command.action === 'in') {
-        scale *= 1.2;
-        refreshRender();
+        // 直接操作DOM来实现缩放
+        const scaleInput = document.getElementById('scaleInput');
+        if (scaleInput) {
+          let currentScale = parseFloat(scaleInput.value) / 100;
+          currentScale *= 1.2;
+          scaleInput.value = (currentScale * 100).toFixed(1);
+          // 触发缩放事件
+          const event = new Event('change');
+          scaleInput.dispatchEvent(event);
+        }
       } else if (command.action === 'out') {
-        scale /= 1.2;
-        refreshRender();
+        const scaleInput = document.getElementById('scaleInput');
+        if (scaleInput) {
+          let currentScale = parseFloat(scaleInput.value) / 100;
+          currentScale /= 1.2;
+          scaleInput.value = (currentScale * 100).toFixed(1);
+          const event = new Event('change');
+          scaleInput.dispatchEvent(event);
+        }
       }
       break;
     case 'reset':
