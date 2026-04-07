@@ -1215,6 +1215,11 @@
         if (!offscreenCanvas || !ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(offscreenCanvas, offsetX, offsetY);
+
+        // 更新视口导航窗口的焦点位置
+        if (isNavVisible) {
+          updateViewportNav();
+        }
       }
 
       // 刷新完整渲染（重新渲染PDF到离屏画布）
@@ -1839,33 +1844,28 @@
       }
 
       // 导航窗口拖动功能
-      let navLongPressTimer = null; // 导航窗口长按检测定时器
       let touchStartX = 0,
         touchStartY = 0; // 触摸起始位置
 
       // 鼠标事件
       navContent.addEventListener("mousedown", (e) => {
-        // 开始长按检测
-        navLongPressTimer = setTimeout(() => {
-          isDraggingNav = true;
-          navDragStartX = e.clientX;
-          navDragStartY = e.clientY;
-          const rect = viewportNav.getBoundingClientRect();
-          navStartX = rect.left;
-          navStartY = rect.top;
-          document.body.style.userSelect = "none";
-          // 添加长按视觉反馈
-          viewportNav.classList.add("long-press");
-        }, 500); // 500ms长按
+        // 单击后立即进入拖动状态
+        isDraggingNav = true;
+        navDragStartX = e.clientX;
+        navDragStartY = e.clientY;
+        const rect = viewportNav.getBoundingClientRect();
+        navStartX = rect.left;
+        navStartY = rect.top;
+        document.body.style.userSelect = "none";
+        // 添加拖动视觉反馈
+        viewportNav.classList.add("long-press");
+        // 震动反馈（如果支持）
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
       });
 
       document.addEventListener("mousemove", (e) => {
-        // 取消长按检测
-        if (navLongPressTimer) {
-          clearTimeout(navLongPressTimer);
-          navLongPressTimer = null;
-        }
-
         if (!isDraggingNav) return;
         const newX = navStartX + (e.clientX - navDragStartX);
         const newY = navStartY + (e.clientY - navDragStartY);
@@ -1874,15 +1874,9 @@
       });
 
       document.addEventListener("mouseup", () => {
-        // 取消长按检测
-        if (navLongPressTimer) {
-          clearTimeout(navLongPressTimer);
-          navLongPressTimer = null;
-        }
-
         isDraggingNav = false;
         document.body.style.userSelect = "";
-        // 移除长按视觉反馈
+        // 移除拖动视觉反馈
         viewportNav.classList.remove("long-press");
       });
 
@@ -1890,30 +1884,26 @@
       navContent.addEventListener("touchstart", (e) => {
         e.preventDefault();
         const touch = e.touches[0];
-        // 开始长按检测
-        navLongPressTimer = setTimeout(() => {
-          isDraggingNav = true;
-          navDragStartX = touch.clientX;
-          navDragStartY = touch.clientY;
-          const rect = viewportNav.getBoundingClientRect();
-          navStartX = rect.left;
-          navStartY = rect.top;
-          // 保存触摸起始位置
-          touchStartX = touch.clientX;
-          touchStartY = touch.clientY;
-          // 添加长按视觉反馈
-          viewportNav.classList.add("long-press");
-        }, 500); // 500ms长按
+        // 单击后立即进入拖动状态
+        isDraggingNav = true;
+        navDragStartX = touch.clientX;
+        navDragStartY = touch.clientY;
+        const rect = viewportNav.getBoundingClientRect();
+        navStartX = rect.left;
+        navStartY = rect.top;
+        // 保存触摸起始位置
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        // 添加拖动视觉反馈
+        viewportNav.classList.add("long-press");
+        // 震动反馈（如果支持）
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
       });
 
       document.addEventListener("touchmove", (e) => {
         e.preventDefault();
-        // 取消长按检测
-        if (navLongPressTimer) {
-          clearTimeout(navLongPressTimer);
-          navLongPressTimer = null;
-        }
-
         if (!isDraggingNav) return;
         const touch = e.touches[0];
         const newX = navStartX + (touch.clientX - navDragStartX);
@@ -1923,14 +1913,8 @@
       });
 
       document.addEventListener("touchend", () => {
-        // 取消长按检测
-        if (navLongPressTimer) {
-          clearTimeout(navLongPressTimer);
-          navLongPressTimer = null;
-        }
-
         isDraggingNav = false;
-        // 移除长按视觉反馈
+        // 移除拖动视觉反馈
         viewportNav.classList.remove("long-press");
       });
 
@@ -2031,14 +2015,47 @@
           renderHeight,
         );
 
-        // 更新视口指示器
-        updateViewportIndicator();
+        // 更新视口指示器，显示焦点位置
+        updateViewportIndicator(renderX, renderY, renderWidth, renderHeight);
       }
 
       // 更新视口指示器
-      function updateViewportIndicator() {
-        // 取消导航视口焦点显示
-        viewportIndicator.style.display = "none";
+      function updateViewportIndicator(
+        renderX,
+        renderY,
+        renderWidth,
+        renderHeight,
+      ) {
+        if (!currentPage || !viewportIndicator) return;
+
+        // 计算视口中心在PDF页面上的位置
+        const canvasRect = canvas.getBoundingClientRect();
+        const canvasCenterX = canvasRect.width / 2;
+        const canvasCenterY = canvasRect.height / 2;
+
+        // 计算PDF页面的视口
+        const viewport = currentPage.getViewport({ scale: scale });
+        const pdfWidth = viewport.width;
+        const pdfHeight = viewport.height;
+
+        // 计算PDF页面上的中心点坐标
+        const pdfCenterX = (canvasCenterX - offsetX) / scale;
+        const pdfCenterY = (canvasCenterY - offsetY) / scale;
+
+        // 计算导航视口中的焦点位置
+        const focusX = renderX + (pdfCenterX / pdfWidth) * renderWidth;
+        const focusY = renderY + (pdfCenterY / pdfHeight) * renderHeight;
+
+        // 设置视口指示器的位置和大小
+        viewportIndicator.style.display = "block";
+        viewportIndicator.style.position = "absolute";
+        viewportIndicator.style.left = `${focusX - 5}px`;
+        viewportIndicator.style.top = `${focusY - 5}px`;
+        viewportIndicator.style.width = "10px";
+        viewportIndicator.style.height = "10px";
+        viewportIndicator.style.backgroundColor = "#ff4d4f";
+        viewportIndicator.style.borderRadius = "50%";
+        viewportIndicator.style.zIndex = "160";
       }
 
       // 导航窗口点击导航功能
