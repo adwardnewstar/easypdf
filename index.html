@@ -1157,6 +1157,16 @@
           if (offscreenCanvas) {
             drawCanvas();
           }
+
+          // 视口尺寸改变时，重置fullContentRender和bestScaleRender
+          // 这样动画时就会使用新的视口尺寸生成的渲染结果，避免跳动
+          fullContentRender = null;
+          bestScaleRender = null;
+
+          // 如果已登录且有PDF文件加载，重新生成渲染结果
+          if (isLoggedIn && currentPage) {
+            resetView().catch((err) => console.error("重置视图失败:", err));
+          }
         }
       }
 
