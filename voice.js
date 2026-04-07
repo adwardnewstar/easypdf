@@ -87,6 +87,7 @@ function initVoiceRecognition() {
         recognition.lang = "zh-CN";
         recognition.continuous = true;
         recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
 
         recognition.onresult = async (event) => {
           let transcript = "";
@@ -96,7 +97,10 @@ function initVoiceRecognition() {
               // 最终结果
               console.log("语音输入:", transcript);
               isListening = false;
-              showVoiceInput(""); // 清空实时显示
+              // 延迟清空显示，让用户有时间看到最终结果
+              setTimeout(() => {
+                showVoiceInput("");
+              }, 500);
               await processVoiceCommand(transcript);
             } else {
               // 中间结果，实时显示
@@ -114,7 +118,10 @@ function initVoiceRecognition() {
 
         recognition.onend = () => {
           isListening = false;
-          showVoiceInput("");
+          // 延迟清空显示，让用户有时间看到最终结果
+          setTimeout(() => {
+            showVoiceInput("");
+          }, 500);
         };
 
         console.log("语音识别初始化成功");
@@ -212,7 +219,7 @@ function initVoiceRecognition() {
 
 // 处理语音指令
 async function processVoiceCommand(transcript) {
-  showLoading(true, "正在分析指令...");
+  // 取消"正在分析指令..."提醒，保持语音输入显示流畅
 
   try {
     // 检查本地存储中是否有HTML缓存
@@ -268,8 +275,6 @@ async function processVoiceCommand(transcript) {
   } catch (error) {
     console.error("处理指令失败:", error);
     showToast("处理指令失败，请重试");
-  } finally {
-    showLoading(false);
   }
 }
 
@@ -313,19 +318,24 @@ function executeCommand(command) {
       break;
     case "openHistory":
       // 打开历史记录中的文件
-      if (typeof loadFromSupabase === "function" && command.index !== undefined) {
+      if (
+        typeof loadFromSupabase === "function" &&
+        command.index !== undefined
+      ) {
         // 先获取历史记录，然后加载指定索引的文件
-        fetchHistoryList().then((historyItems) => {
-          if (historyItems && historyItems.length > command.index) {
-            const item = historyItems[command.index];
-            loadFromSupabase(item.storage_path, item.file_name);
-          } else {
-            showToast("历史记录中没有找到该文件");
-          }
-        }).catch((error) => {
-          console.error("获取历史记录失败:", error);
-          showToast("获取历史记录失败");
-        });
+        fetchHistoryList()
+          .then((historyItems) => {
+            if (historyItems && historyItems.length > command.index) {
+              const item = historyItems[command.index];
+              loadFromSupabase(item.storage_path, item.file_name);
+            } else {
+              showToast("历史记录中没有找到该文件");
+            }
+          })
+          .catch((error) => {
+            console.error("获取历史记录失败:", error);
+            showToast("获取历史记录失败");
+          });
       } else {
         showToast("无法打开历史文件");
       }
