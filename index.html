@@ -732,8 +732,7 @@
         top: 100px; /* 位于工具栏目下方 */
         left: 20px;
         height: calc(100vh / 7); /* 高度固定为屏幕高度的1/7 */
-        width: calc(100vh / 7 * 1.414); /* 宽度为高度的√2倍，保持合适的比例 */
-        min-width: 140px;
+        width: calc(100vh / 7 * 1.5); /* 宽度为高度的1.5倍，保持1:1.5的比例 */
         background: rgba(30, 30, 38, 0.9);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -743,6 +742,16 @@
         overflow: hidden;
         /* 响应式设计 */
         max-width: 90vw;
+        /* 过渡效果 */
+        transition:
+          transform 0.1s ease,
+          box-shadow 0.1s ease;
+      }
+
+      /* 长按视觉反馈 */
+      .viewport-nav.long-press {
+        transform: scale(1.02);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
       }
 
       .nav-content {
@@ -1820,17 +1829,33 @@
       }
 
       // 导航窗口拖动功能
+      let navLongPressTimer = null; // 导航窗口长按检测定时器
+      let touchStartX = 0,
+        touchStartY = 0; // 触摸起始位置
+
+      // 鼠标事件
       navContent.addEventListener("mousedown", (e) => {
-        isDraggingNav = true;
-        navDragStartX = e.clientX;
-        navDragStartY = e.clientY;
-        const rect = viewportNav.getBoundingClientRect();
-        navStartX = rect.left;
-        navStartY = rect.top;
-        document.body.style.userSelect = "none";
+        // 开始长按检测
+        navLongPressTimer = setTimeout(() => {
+          isDraggingNav = true;
+          navDragStartX = e.clientX;
+          navDragStartY = e.clientY;
+          const rect = viewportNav.getBoundingClientRect();
+          navStartX = rect.left;
+          navStartY = rect.top;
+          document.body.style.userSelect = "none";
+          // 添加长按视觉反馈
+          viewportNav.classList.add("long-press");
+        }, 500); // 500ms长按
       });
 
       document.addEventListener("mousemove", (e) => {
+        // 取消长按检测
+        if (navLongPressTimer) {
+          clearTimeout(navLongPressTimer);
+          navLongPressTimer = null;
+        }
+
         if (!isDraggingNav) return;
         const newX = navStartX + (e.clientX - navDragStartX);
         const newY = navStartY + (e.clientY - navDragStartY);
@@ -1839,8 +1864,64 @@
       });
 
       document.addEventListener("mouseup", () => {
+        // 取消长按检测
+        if (navLongPressTimer) {
+          clearTimeout(navLongPressTimer);
+          navLongPressTimer = null;
+        }
+
         isDraggingNav = false;
         document.body.style.userSelect = "";
+        // 移除长按视觉反馈
+        viewportNav.classList.remove("long-press");
+      });
+
+      // 触摸事件
+      navContent.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        // 开始长按检测
+        navLongPressTimer = setTimeout(() => {
+          isDraggingNav = true;
+          navDragStartX = touch.clientX;
+          navDragStartY = touch.clientY;
+          const rect = viewportNav.getBoundingClientRect();
+          navStartX = rect.left;
+          navStartY = rect.top;
+          // 保存触摸起始位置
+          touchStartX = touch.clientX;
+          touchStartY = touch.clientY;
+          // 添加长按视觉反馈
+          viewportNav.classList.add("long-press");
+        }, 500); // 500ms长按
+      });
+
+      document.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        // 取消长按检测
+        if (navLongPressTimer) {
+          clearTimeout(navLongPressTimer);
+          navLongPressTimer = null;
+        }
+
+        if (!isDraggingNav) return;
+        const touch = e.touches[0];
+        const newX = navStartX + (touch.clientX - navDragStartX);
+        const newY = navStartY + (touch.clientY - navDragStartY);
+        viewportNav.style.left = `${newX}px`;
+        viewportNav.style.top = `${newY}px`;
+      });
+
+      document.addEventListener("touchend", () => {
+        // 取消长按检测
+        if (navLongPressTimer) {
+          clearTimeout(navLongPressTimer);
+          navLongPressTimer = null;
+        }
+
+        isDraggingNav = false;
+        // 移除长按视觉反馈
+        viewportNav.classList.remove("long-press");
       });
 
       // 导航窗口焦点取消功能
