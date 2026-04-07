@@ -1,0 +1,68 @@
+exports.handler = async (event, context) => {
+  try {
+    const { transcript, html } = JSON.parse(event.body);
+    
+    // 调用DeepSeek API
+    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: `你是一个PDF阅读器的语音助手，需要分析用户的语音指令并生成相应的操作命令。
+            分析HTML结构，识别可用的功能按钮和操作。
+            可能的指令类型包括：
+            - open: 打开文件
+            - zoom: 缩放（in/out）
+            - reset: 重置视图
+            - fullscreen: 全屏
+            - history: 历史记录
+            
+            请返回JSON格式的指令，例如：
+            {
+              "command": {
+                "type": "zoom",
+                "action": "in"
+              }
+            }`
+          },
+          {
+            role: 'user',
+            content: `用户指令: ${transcript}
+            HTML结构: ${html.substring(0, 5000)}`
+          }
+        ],
+        temperature: 0.3
+      })
+    });
+    
+    const deepseekResult = await deepseekResponse.json();
+    const content = deepseekResult.choices[0].message.content;
+    
+    // 解析DeepSeek的响应
+    const commandMatch = content.match(/\{.*\}/s);
+    if (commandMatch) {
+      const command = JSON.parse(commandMatch[0]);
+      return {
+        statusCode: 200,
+        body: JSON.stringify(command)
+      };
+    } else {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ command: null })
+      };
+    }
+  } catch (error) {
+    console.error('DeepSeek API调用失败:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: '处理失败' })
+    };
+  }
+};
