@@ -1832,8 +1832,9 @@
           // 计算导航视口位置，确保距离工具栏的距离是响应式的
           const toolbar = document.querySelector(".toolbar");
           const toolbarHeight = toolbar ? toolbar.offsetHeight : 100;
-          viewportNav.style.top = `${toolbarHeight + 20}px`;
-          viewportNav.style.left = "20px";
+          const margin = 20; // 边距值，确保上边缘距离工具栏下边缘的距离与左边缘距离屏幕左边的距离相等
+          viewportNav.style.top = `${toolbarHeight + margin}px`;
+          viewportNav.style.left = `${margin}px`;
           viewportNav.style.display = "block";
           updateViewportNav();
           // 设置长按触发标志，防止点击事件立即隐藏导航窗口
@@ -1859,10 +1860,6 @@
         document.body.style.userSelect = "none";
         // 添加拖动视觉反馈
         viewportNav.classList.add("long-press");
-        // 震动反馈（如果支持）
-        if (navigator.vibrate) {
-          navigator.vibrate(50);
-        }
       });
 
       document.addEventListener("mousemove", (e) => {
@@ -1896,10 +1893,6 @@
         touchStartY = touch.clientY;
         // 添加拖动视觉反馈
         viewportNav.classList.add("long-press");
-        // 震动反馈（如果支持）
-        if (navigator.vibrate) {
-          navigator.vibrate(50);
-        }
       });
 
       document.addEventListener("touchmove", (e) => {
@@ -1925,10 +1918,27 @@
       let isNavEnlarged = false; // 导航窗口是否已放大
       let navOriginalWidth = 0; // 导航窗口原始宽度
       let navOriginalHeight = 0; // 导航窗口原始高度
+      let lastTouchTime = 0; // 上次触摸时间
 
+      // 处理鼠标双击事件
       navContent.addEventListener("dblclick", (e) => {
         e.stopPropagation(); // 阻止事件冒泡
+        handleNavDoubleClick();
+      });
 
+      // 处理触摸双击事件
+      navContent.addEventListener("touchstart", (e) => {
+        e.stopPropagation(); // 阻止事件冒泡
+        const currentTime = new Date().getTime();
+        const touchTime = currentTime - lastTouchTime;
+        if (touchTime < 300 && touchTime > 0) {
+          // 双击
+          handleNavDoubleClick();
+        }
+        lastTouchTime = currentTime;
+      });
+
+      function handleNavDoubleClick() {
         const rect = viewportNav.getBoundingClientRect();
 
         if (!isNavEnlarged) {
@@ -1950,7 +1960,7 @@
 
         // 更新导航窗口内容
         updateViewportNav();
-      });
+      }
 
       // 窗口大小变化时调整导航视口位置
       window.addEventListener("resize", () => {
@@ -1958,7 +1968,9 @@
           // 计算导航视口位置，确保距离工具栏的距离是响应式的
           const toolbar = document.querySelector(".toolbar");
           const toolbarHeight = toolbar ? toolbar.offsetHeight : 100;
-          viewportNav.style.top = `${toolbarHeight + 20}px`;
+          const margin = 20; // 边距值，确保上边缘距离工具栏下边缘的距离与左边缘距离屏幕左边的距离相等
+          viewportNav.style.top = `${toolbarHeight + margin}px`;
+          viewportNav.style.left = `${margin}px`;
           // 更新导航窗口内容
           updateViewportNav();
         }
