@@ -34,6 +34,7 @@ function initVoiceRecognition() {
   let recognition = null;
   let longPressTimer = null;
   let isListening = false;
+  let isLongPress = false;
   
   console.log('初始化语音识别...');
   
@@ -71,14 +72,11 @@ function initVoiceRecognition() {
     }
   }
   
-  let clickTimer = null;
-  
   // 长按处理
   speechBtn.addEventListener('mousedown', () => {
-    // 清除之前的单击计时器
-    clearTimeout(clickTimer);
-    
+    isLongPress = false;
     longPressTimer = setTimeout(() => {
+      isLongPress = true;
       if (!isListening) {
         initRecognition();
         if (recognition) {
@@ -99,31 +97,18 @@ function initVoiceRecognition() {
   // 鼠标释放处理
   speechBtn.addEventListener('mouseup', () => {
     clearTimeout(longPressTimer);
-    
-    // 如果没有触发长按，则视为单击
-    clickTimer = setTimeout(() => {
-      if (viewportNav) {
-        if (viewportNav.style.display === 'none' || viewportNav.style.display === '') {
-          viewportNav.style.display = 'block';
-        } else {
-          viewportNav.style.display = 'none';
-        }
-      }
-    }, 100); // 100毫秒内释放视为单击
   });
   
   // 鼠标离开处理
   speechBtn.addEventListener('mouseleave', () => {
     clearTimeout(longPressTimer);
-    clearTimeout(clickTimer);
   });
   
   // 触摸设备支持
   speechBtn.addEventListener('touchstart', () => {
-    // 清除之前的单击计时器
-    clearTimeout(clickTimer);
-    
+    isLongPress = false;
     longPressTimer = setTimeout(() => {
+      isLongPress = true;
       if (!isListening) {
         initRecognition();
         if (recognition) {
@@ -143,9 +128,12 @@ function initVoiceRecognition() {
   
   speechBtn.addEventListener('touchend', () => {
     clearTimeout(longPressTimer);
-    
-    // 如果没有触发长按，则视为单击
-    clickTimer = setTimeout(() => {
+  });
+  
+  // 单击处理：切换导航窗口
+  speechBtn.addEventListener('click', () => {
+    // 如果是长按触发的，不执行导航窗口切换
+    if (!isLongPress) {
       if (viewportNav) {
         if (viewportNav.style.display === 'none' || viewportNav.style.display === '') {
           viewportNav.style.display = 'block';
@@ -153,7 +141,7 @@ function initVoiceRecognition() {
           viewportNav.style.display = 'none';
         }
       }
-    }, 100); // 100毫秒内释放视为单击
+    }
   });
 }
 
