@@ -725,6 +725,50 @@
         margin-top: 1vh;
         min-height: 2.5vh;
       }
+
+      /* 视口导航窗口 */
+      .viewport-nav {
+        position: fixed;
+        top: 100px; /* 位于工具栏目下方 */
+        left: 20px;
+        height: calc(100vh / 7); /* 高度固定为屏幕高度的1/7 */
+        width: calc(100vh / 7 * 1.414); /* 宽度为高度的√2倍，保持合适的比例 */
+        min-width: 140px;
+        background: rgba(30, 30, 38, 0.9);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        z-index: 150;
+        overflow: hidden;
+        /* 响应式设计 */
+        max-width: 90vw;
+      }
+
+      .nav-content {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        cursor: move; /* 整个导航窗口都可以拖动 */
+      }
+
+      #navCanvas {
+        width: 100%;
+        height: 100%;
+        background: white;
+        display: block;
+      }
+
+      .viewport-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        border: 2px solid #ff9800;
+        background: rgba(255, 152, 0, 0.3);
+        pointer-events: none;
+        border-radius: 2px;
+      }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
@@ -835,6 +879,15 @@
         <img src="assets/icon/刷新.svg" alt="加载中" class="loading-icon" />
         <span>加载中...</span>
       </div>
+
+      <!-- 视口导航窗口 -->
+      <div id="viewportNav" class="viewport-nav" style="display: none">
+        <div class="nav-content" id="navContent">
+          <canvas id="navCanvas"></canvas>
+          <div class="viewport-indicator" id="viewportIndicator"></div>
+        </div>
+      </div>
+
       <input
         type="file"
         id="fileInput"
@@ -861,6 +914,14 @@
       const app = document.getElementById("app");
       const historyMenu = document.getElementById("historyMenu");
       const loadingMask = document.getElementById("loadingMask");
+
+      // 视口导航窗口元素
+      const viewportNav = document.getElementById("viewportNav");
+      const navHeader = document.getElementById("navHeader");
+      const navContent = document.getElementById("navContent");
+      const navCanvas = document.getElementById("navCanvas");
+      const navCtx = navCanvas?.getContext("2d");
+      const viewportIndicator = document.getElementById("viewportIndicator");
 
       // ==================== 全局状态 ====================
       let pdfDoc = null; // PDF文档对象
@@ -905,6 +966,15 @@
         touchStartOffsetY = 0;
 
       let isRendering = false;
+
+      // 导航窗口状态
+      let navCanvasRender = null; // 导航窗口的渲染结果
+      let isNavVisible = false; // 导航窗口是否可见
+      let isDraggingNav = false; // 是否正在拖动导航窗口
+      let navDragStartX = 0,
+        navDragStartY = 0; // 导航窗口拖动起始位置
+      let navStartX = 0,
+        navStartY = 0; // 导航窗口起始位置
 
       // 初始化最佳比例按钮状态
       function initBestScaleButton() {
@@ -1179,6 +1249,10 @@
 
           drawCanvas();
           updateScaleInput();
+          // 更新视口导航窗口
+          if (isNavVisible) {
+            updateViewportNav();
+          }
         } catch (err) {
           console.error("渲染失败", err);
         } finally {
@@ -1196,6 +1270,10 @@
       // 仅更新平移（不重新渲染）
       function updatePan() {
         if (offscreenCanvas) drawCanvas();
+        // 更新视口导航窗口
+        if (isNavVisible) {
+          updateViewportIndicator();
+        }
       }
 
       // 重置视图为完整显示（不留边距）
@@ -1213,7 +1291,7 @@
         const imgW = viewport.width * dpr;
         const imgH = viewport.height * dpr;
         let newScale = Math.min(canvasW / imgW, canvasH / imgH);
-        newScale = Math.min(8, newScale);
+        newScale = Math.min(20, newScale);
 
         // 创建临时离屏画布用于计算和暂存渲染结果
         const tempOffscreenCanvas = document.createElement("canvas");
@@ -1285,7 +1363,7 @@
       // 中心缩放
       async function scaleAtPoint(newScale, centerX, centerY) {
         if (!currentPage || locked) return;
-        newScale = Math.min(2000, newScale); // 解锁到2000倍放大
+        newScale = Math.min(20, newScale); // 统一为20倍放大
         if (Math.abs(newScale - scale) < 0.001) return;
         const oldScale = scale;
         const newOffX = centerX - (centerX - offsetX) * (newScale / oldScale);
@@ -1704,6 +1782,144 @@
           isUsingBestScale = false;
         }
       }
+
+      // 切换视口导航窗口
+      function toggleViewportNav() {
+        if (!currentPage) return;
+
+        isNavVisible = !isNavVisible;
+        if (isNavVisible) {
+          viewportNav.style.display = "block";
+          updateViewportNav();
+        } else {
+          viewportNav.style.display = "none";
+        }
+      }
+
+      // 导航窗口拖动功能
+      navContent.addEventListener("mousedown", (e) => {
+        isDraggingNav = true;
+        navDragStartX = e.clientX;
+        navDragStartY = e.clientY;
+        const rect = viewportNav.getBoundingClientRect();
+        navStartX = rect.left;
+        navStartY = rect.top;
+        document.body.style.userSelect = "none";
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isDraggingNav) return;
+        const newX = navStartX + (e.clientX - navDragStartX);
+        const newY = navStartY + (e.clientY - navDragStartY);
+        viewportNav.style.left = `${newX}px`;
+        viewportNav.style.top = `${newY}px`;
+      });
+
+      document.addEventListener("mouseup", () => {
+        isDraggingNav = false;
+        document.body.style.userSelect = "";
+      });
+
+      // 更新视口导航窗口
+      function updateViewportNav() {
+        if (!currentPage || !navCtx || !fullContentRender) return;
+
+        // 计算导航窗口的尺寸
+        const navRect = navContent.getBoundingClientRect();
+        const navWidth = navRect.width;
+        const navHeight = navRect.height;
+
+        // 设置导航画布的尺寸
+        navCanvas.width = navWidth;
+        navCanvas.height = navHeight;
+
+        // 计算缩放比例，保持原始比例
+        const scaleX = navWidth / fullContentRender.width;
+        const scaleY = navHeight / fullContentRender.height;
+        const renderScale = Math.min(scaleX, scaleY);
+
+        // 计算渲染位置，居中显示
+        const renderWidth = fullContentRender.width * renderScale;
+        const renderHeight = fullContentRender.height * renderScale;
+        const renderX = (navWidth - renderWidth) / 2;
+        const renderY = (navHeight - renderHeight) / 2;
+
+        // 使用全显缩小的渲染结果
+        navCtx.clearRect(0, 0, navWidth, navHeight);
+        navCtx.drawImage(
+          fullContentRender,
+          0,
+          0,
+          fullContentRender.width,
+          fullContentRender.height,
+          renderX,
+          renderY,
+          renderWidth,
+          renderHeight,
+        );
+
+        // 更新视口指示器
+        updateViewportIndicator();
+      }
+
+      // 更新视口指示器
+      function updateViewportIndicator() {
+        if (!currentPage || !navContent || !fullContentRender) return;
+
+        const navRect = navContent.getBoundingClientRect();
+        const navWidth = navRect.width;
+        const navHeight = navRect.height;
+
+        // 计算视口在导航窗口中的位置
+        const viewport = currentPage.getViewport({ scale: 1 });
+
+        // 计算导航窗口的缩放比例，保持原始比例
+        const scaleX = navWidth / fullContentRender.width;
+        const scaleY = navHeight / fullContentRender.height;
+        const renderScale = Math.min(scaleX, scaleY);
+
+        // 计算渲染位置，居中显示
+        const renderWidth = fullContentRender.width * renderScale;
+        const renderHeight = fullContentRender.height * renderScale;
+        const renderX = (navWidth - renderWidth) / 2;
+        const renderY = (navHeight - renderHeight) / 2;
+
+        // 计算全显比例
+        const rect = canvasArea.getBoundingClientRect();
+        let canvasW = rect.width || window.innerWidth;
+        let canvasH = rect.height || window.innerHeight;
+        canvasW = canvasW * dpr;
+        canvasH = canvasH * dpr;
+        const imgW = viewport.width * dpr;
+        const imgH = viewport.height * dpr;
+        const fullScale = Math.min(canvasW / imgW, canvasH / imgH);
+
+        // 计算主视图中心点在PDF中的坐标
+        const mainViewCenterX = (canvas.width / 2 - offsetX / dpr) / scale;
+        const mainViewCenterY = (canvas.height / 2 - offsetY / dpr) / scale;
+
+        // 计算中心点在全显渲染结果中的位置
+        const fullRenderCenterX = mainViewCenterX * fullScale * dpr;
+        const fullRenderCenterY = mainViewCenterY * fullScale * dpr;
+
+        // 计算中心点在导航窗口中的位置
+        const centerX =
+          (fullRenderCenterX / fullContentRender.width) * renderWidth + renderX;
+        const centerY =
+          (fullRenderCenterY / fullContentRender.height) * renderHeight +
+          renderY;
+
+        // 设置视口指示器的样式（固定大小的中心点指示器）
+        viewportIndicator.style.width = "10px";
+        viewportIndicator.style.height = "10px";
+        viewportIndicator.style.left = `${centerX - 5}px`;
+        viewportIndicator.style.top = `${centerY - 5}px`;
+        viewportIndicator.style.borderRadius = "50%";
+        viewportIndicator.style.backgroundColor = "rgba(255, 165, 0, 0.7)";
+        viewportIndicator.style.border = "2px solid white";
+      }
+
+      // 导航窗口点击导航功能
 
       // ==================== CAD PDF检测 ====================
       // 分析PDF是否是DWG/CAD转的
@@ -2151,10 +2367,20 @@
         startOffsetX = offsetX;
         startOffsetY = offsetY;
         canvasArea.style.cursor = "grabbing";
+
+        // 开始长按检测
+        longPressTimer = setTimeout(() => {
+          toggleViewportNav();
+        }, 800); // 800ms长按
       }
       function onMouseMove(e) {
         if (!isDragging || !offscreenCanvas) return;
         e.preventDefault();
+        // 取消长按检测
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
         offsetX = startOffsetX + (e.clientX * dpr - dragStartX);
         offsetY = startOffsetY + (e.clientY * dpr - dragStartY);
         updatePan();
@@ -2162,6 +2388,11 @@
       function onMouseUp() {
         isDragging = false;
         canvasArea.style.cursor = "grab";
+        // 取消长按检测
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
       }
       // 滚轮事件防抖
       let wheelTimeout = null;
@@ -2260,7 +2491,7 @@
           const cx = curCenter.x - rect.left * dpr;
           const cy = curCenter.y - rect.top * dpr;
           let newScale = touchStartScale * (curDist / touchStartDistance);
-          newScale = Math.min(8, Math.max(0.2, newScale));
+          newScale = Math.min(20, Math.max(0.2, newScale));
           const ratio = newScale / touchStartScale;
           offsetX = cx - (touchStartCenter.x - touchStartOffsetX) * ratio;
           offsetY = cy - (touchStartCenter.y - touchStartOffsetY) * ratio;
@@ -2856,7 +3087,7 @@
           const imgW = viewport.width * dpr;
           const imgH = viewport.height * dpr;
           let newScale = Math.min(canvasW / imgW, canvasH / imgH);
-          return Math.min(8, newScale);
+          return Math.min(20, newScale);
         }
 
         // 平滑缩放动画
