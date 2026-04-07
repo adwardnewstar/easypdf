@@ -1979,83 +1979,101 @@
 
       // 更新视口导航窗口
       function updateViewportNav() {
-        if (!currentPage || !navCtx || !fullContentRender) return;
+        if (!currentPage || !navCtx) return;
 
         // 计算导航窗口的尺寸
         const navRect = navContent.getBoundingClientRect();
         const navWidth = navRect.width;
         const navHeight = navRect.height;
 
-        // 设置导航画布的尺寸
-        navCanvas.width = navWidth;
-        navCanvas.height = navHeight;
+        // 设置导航画布的尺寸，使用设备像素比提高清晰度
+        const deviceNavWidth = navWidth * dpr;
+        const deviceNavHeight = navHeight * dpr;
+        navCanvas.width = deviceNavWidth;
+        navCanvas.height = deviceNavHeight;
+        navCanvas.style.width = `${navWidth}px`;
+        navCanvas.style.height = `${navHeight}px`;
 
-        // 计算缩放比例，保持原始比例
-        const scaleX = navWidth / fullContentRender.width;
-        const scaleY = navHeight / fullContentRender.height;
-        const renderScale = Math.min(scaleX, scaleY);
+        // 清空画布
+        navCtx.clearRect(0, 0, deviceNavWidth, deviceNavHeight);
 
-        // 计算渲染位置，居中显示
-        const renderWidth = fullContentRender.width * renderScale;
-        const renderHeight = fullContentRender.height * renderScale;
-        const renderX = (navWidth - renderWidth) / 2;
-        const renderY = (navHeight - renderHeight) / 2;
+        if (fullContentRender) {
+          // 计算缩放比例，保持原始比例
+          const scaleX = deviceNavWidth / fullContentRender.width;
+          const scaleY = deviceNavHeight / fullContentRender.height;
+          const renderScale = Math.min(scaleX, scaleY);
 
-        // 使用全显缩小的渲染结果
-        navCtx.clearRect(0, 0, navWidth, navHeight);
-        navCtx.drawImage(
-          fullContentRender,
-          0,
-          0,
-          fullContentRender.width,
-          fullContentRender.height,
-          renderX,
-          renderY,
-          renderWidth,
-          renderHeight,
-        );
+          // 计算渲染位置，居中显示
+          const renderWidth = fullContentRender.width * renderScale;
+          const renderHeight = fullContentRender.height * renderScale;
+          const renderX = (deviceNavWidth - renderWidth) / 2;
+          const renderY = (deviceNavHeight - renderHeight) / 2;
 
-        // 更新视口指示器，显示焦点位置
-        updateViewportIndicator(renderX, renderY, renderWidth, renderHeight);
+          // 使用全显缩小的渲染结果，提高清晰度
+          navCtx.drawImage(
+            fullContentRender,
+            0,
+            0,
+            fullContentRender.width,
+            fullContentRender.height,
+            renderX,
+            renderY,
+            renderWidth,
+            renderHeight,
+          );
+
+          // 更新视口指示器，显示焦点位置
+          updateViewportIndicator(
+            renderX / dpr,
+            renderY / dpr,
+            renderWidth / dpr,
+            renderHeight / dpr,
+          );
+        } else if (currentPage) {
+          // 如果fullContentRender不存在，直接渲染PDF页面到导航画布
+          const viewport = currentPage.getViewport({ scale: 1 });
+          const scaleX = deviceNavWidth / viewport.width;
+          const scaleY = deviceNavHeight / viewport.height;
+          const renderScale = Math.min(scaleX, scaleY);
+          const renderViewport = currentPage.getViewport({
+            scale: renderScale,
+          });
+
+          const renderWidth = renderViewport.width;
+          const renderHeight = renderViewport.height;
+          const renderX = (deviceNavWidth - renderWidth) / 2;
+          const renderY = (deviceNavHeight - renderHeight) / 2;
+
+          // 渲染PDF页面到导航画布
+          currentPage
+            .render({
+              canvasContext: navCtx,
+              viewport: renderViewport,
+              background: "white",
+              renderIntent: "print",
+            })
+            .promise.then(() => {
+              // 更新视口指示器，显示焦点位置
+              updateViewportIndicator(
+                renderX / dpr,
+                renderY / dpr,
+                renderWidth / dpr,
+                renderHeight / dpr,
+              );
+            });
+        }
       }
 
-      // 更新视口指示器
+      // 更新视口指示器（已取消焦点显示）
       function updateViewportIndicator(
         renderX,
         renderY,
         renderWidth,
         renderHeight,
       ) {
-        if (!currentPage || !viewportIndicator) return;
-
-        // 计算视口中心在PDF页面上的位置
-        const canvasRect = canvas.getBoundingClientRect();
-        const canvasCenterX = canvasRect.width / 2;
-        const canvasCenterY = canvasRect.height / 2;
-
-        // 计算PDF页面的视口
-        const viewport = currentPage.getViewport({ scale: scale });
-        const pdfWidth = viewport.width;
-        const pdfHeight = viewport.height;
-
-        // 计算PDF页面上的中心点坐标
-        const pdfCenterX = (canvasCenterX - offsetX) / scale;
-        const pdfCenterY = (canvasCenterY - offsetY) / scale;
-
-        // 计算导航视口中的焦点位置
-        const focusX = renderX + (pdfCenterX / pdfWidth) * renderWidth;
-        const focusY = renderY + (pdfCenterY / pdfHeight) * renderHeight;
-
-        // 设置视口指示器的位置和大小
-        viewportIndicator.style.display = "block";
-        viewportIndicator.style.position = "absolute";
-        viewportIndicator.style.left = `${focusX - 5}px`;
-        viewportIndicator.style.top = `${focusY - 5}px`;
-        viewportIndicator.style.width = "10px";
-        viewportIndicator.style.height = "10px";
-        viewportIndicator.style.backgroundColor = "#ff4d4f";
-        viewportIndicator.style.borderRadius = "50%";
-        viewportIndicator.style.zIndex = "160";
+        if (!viewportIndicator) return;
+        // 取消焦点显示
+        viewportIndicator.style.display = "none";
       }
 
       // 导航窗口点击导航功能
