@@ -808,7 +808,7 @@
             autocomplete="off"
           />
         </div>
-        <button class="login-button" id="loginButton">LOGIN</button>
+        <button class="login-button" id="loginButton">Login</button>
         <div class="login-error" id="loginError"></div>
       </div>
     </div>
@@ -1020,7 +1020,16 @@
 
       async function login(email, password) {
         const loginError = document.getElementById("loginError");
+        const loginButton = document.getElementById("loginButton");
+        const originalButtonText = loginButton ? loginButton.textContent : "";
+
         loginError.textContent = "";
+
+        // 修改按钮文本为"Please wait..."
+        if (loginButton) {
+          loginButton.textContent = "Please wait...";
+          loginButton.disabled = true;
+        }
 
         try {
           const { data, error } = await supabaseClient.auth.signInWithPassword({
@@ -1045,6 +1054,12 @@
         } catch (err) {
           loginError.textContent = "登录失败：" + err.message;
           return false;
+        } finally {
+          // 恢复按钮文本
+          if (loginButton) {
+            loginButton.textContent = originalButtonText;
+            loginButton.disabled = false;
+          }
         }
       }
 
@@ -1874,6 +1889,19 @@
         }
       });
 
+      // 语音按钮点击事件，切换导航视口显示状态
+      let isVoiceBtnLongPress = false; // 是否是长按操作
+      const voiceBtn = document.getElementById("thumbCard");
+      if (voiceBtn) {
+        voiceBtn.addEventListener("click", (e) => {
+          e.stopPropagation(); // 阻止事件冒泡
+          // 如果不是长按操作，则切换导航视口显示状态
+          if (!isVoiceBtnLongPress) {
+            toggleViewportNav();
+          }
+        });
+      }
+
       // 更新视口导航窗口
       function updateViewportNav() {
         if (!currentPage || !navCtx || !fullContentRender) return;
@@ -2371,10 +2399,11 @@
         startOffsetY = offsetY;
         canvasArea.style.cursor = "grabbing";
 
-        // 开始长按检测
-        longPressTimer = setTimeout(() => {
-          toggleViewportNav();
-        }, 800); // 800ms长按
+        // 取消长按检测，改为单击语音按钮开启关闭导航视口
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
       }
       function onMouseMove(e) {
         if (!isDragging || !offscreenCanvas) return;
@@ -3434,21 +3463,35 @@
         });
 
         // 语音按钮
+        let thumbCardLongPressTimer = null; // 语音按钮长按检测定时器
+
         thumbCard.addEventListener("mousedown", () => {
           if (!isLoggedIn) {
             showLoginOverlay();
             return;
           }
-          // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
-          thumbCard.style.background = "#333333";
-          const icon = thumbCard.querySelector("img");
-          if (icon) {
-            icon.style.filter = "brightness(0) invert(1)";
-          }
+          // 重置长按标志
+          isVoiceBtnLongPress = false;
+          // 开始长按检测
+          thumbCardLongPressTimer = setTimeout(() => {
+            // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
+            thumbCard.style.background = "#333333";
+            const icon = thumbCard.querySelector("img");
+            if (icon) {
+              icon.style.filter = "brightness(0) invert(1)";
+            }
+            // 设置长按标志
+            isVoiceBtnLongPress = true;
+          }, 500); // 500ms长按
         });
 
         thumbCard.addEventListener("mouseup", () => {
-          // 长按结束：平滑过渡到原始状态
+          // 取消长按检测
+          if (thumbCardLongPressTimer) {
+            clearTimeout(thumbCardLongPressTimer);
+            thumbCardLongPressTimer = null;
+          }
+          // 恢复原始状态
           thumbCard.style.background = "#c3c3c3";
           const icon = thumbCard.querySelector("img");
           if (icon) {
@@ -3457,7 +3500,12 @@
         });
 
         thumbCard.addEventListener("mouseleave", () => {
-          // 鼠标离开：恢复原始状态
+          // 取消长按检测
+          if (thumbCardLongPressTimer) {
+            clearTimeout(thumbCardLongPressTimer);
+            thumbCardLongPressTimer = null;
+          }
+          // 恢复原始状态
           thumbCard.style.background = "#c3c3c3";
           const icon = thumbCard.querySelector("img");
           if (icon) {
@@ -3471,16 +3519,28 @@
             showLoginOverlay();
             return;
           }
-          // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
-          thumbCard.style.background = "#333333";
-          const icon = thumbCard.querySelector("img");
-          if (icon) {
-            icon.style.filter = "brightness(0) invert(1)";
-          }
+          // 重置长按标志
+          isVoiceBtnLongPress = false;
+          // 开始长按检测
+          thumbCardLongPressTimer = setTimeout(() => {
+            // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
+            thumbCard.style.background = "#333333";
+            const icon = thumbCard.querySelector("img");
+            if (icon) {
+              icon.style.filter = "brightness(0) invert(1)";
+            }
+            // 设置长按标志
+            isVoiceBtnLongPress = true;
+          }, 500); // 500ms长按
         });
 
         thumbCard.addEventListener("touchend", () => {
-          // 长按结束：平滑过渡到原始状态
+          // 取消长按检测
+          if (thumbCardLongPressTimer) {
+            clearTimeout(thumbCardLongPressTimer);
+            thumbCardLongPressTimer = null;
+          }
+          // 恢复原始状态
           thumbCard.style.background = "#c3c3c3";
           const icon = thumbCard.querySelector("img");
           if (icon) {
