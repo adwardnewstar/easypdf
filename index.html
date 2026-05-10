@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -106,9 +106,7 @@
       }
       .top-bar,
       .top-bar.show {
-        transition:
-          transform 0.3s ease-in-out,
-          opacity 0.3s ease-in-out;
+        transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
       }
       .top-bar.show {
         transform: translateY(0);
@@ -149,9 +147,7 @@
         justify-content: center;
         cursor: pointer;
         color: #333333; /* 设置文字颜色，影响 SVG 的 currentColor */
-        transition:
-          transform 0.2s ease,
-          box-shadow 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
         font-size: 20px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         /* 强制硬件加速，减少残影 */
@@ -217,9 +213,7 @@
         min-width: 66px;
         color: white;
         font-size: 3vh;
-        transition:
-          transform 0.05s,
-          opacity 0.2s;
+        transition: transform 0.05s, opacity 0.2s;
         font-weight: 500;
         text-align: center;
         outline: none;
@@ -385,10 +379,7 @@
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
         font-size: 28px;
         color: white;
-        transition:
-          transform 0.05s,
-          opacity 0.2s,
-          background 0.3s ease;
+        transition: transform 0.05s, opacity 0.2s, background 0.3s ease;
         padding: 0;
         outline: none;
       }
@@ -535,9 +526,7 @@
         align-items: center;
         justify-content: flex-start;
         cursor: pointer;
-        transition:
-          background 0.1s,
-          border-radius 0.1s;
+        transition: background 0.1s, border-radius 0.1s;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1015,9 +1004,7 @@
         transform: translateZ(0);
         will-change: transform;
         /* 过渡效果 */
-        transition:
-          transform 0.1s ease,
-          box-shadow 0.1s ease;
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
       }
 
       /* 长按视觉反馈 */
@@ -1388,7 +1375,9 @@
           return windowId;
         }
         // 生成新的windowId
-        const newWindowId = `win_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const newWindowId = `win_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
         localStorage.setItem("easypdf_window_id", newWindowId);
         console.log("生成新windowId:", newWindowId);
         return newWindowId;
@@ -1528,7 +1517,7 @@
         const today = new Date();
         const dateStr = today.toISOString().split("T")[0];
         const storedSession = localStorage.getItem(
-          `easypdf_session_${dateStr}`,
+          `easypdf_session_${dateStr}`
         );
 
         if (storedSession) {
@@ -1537,10 +1526,39 @@
         }
 
         // 生成新的sessionId
-        const newSessionId = `${dateStr}-${Math.random().toString(36).substr(2, 9)}`;
+        const newSessionId = `${dateStr}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
         localStorage.setItem(`easypdf_session_${dateStr}`, newSessionId);
         console.log("生成新session:", newSessionId);
         return newSessionId;
+      }
+
+      // WebSocket服务器地址配置
+      // 在Netlify上部署时，通过环境变量WS_SERVER指定Render服务器地址
+      // 例如：wss://easypdf-ws.onrender.com
+      // 本地开发时使用window.location.host
+      function getWsServer() {
+        // 如果存在全局配置变量，使用它
+        if (window.__WS_SERVER__) {
+          return window.__WS_SERVER__;
+        }
+        // 检查是否是Netlify部署环境
+        const hostname = window.location.hostname;
+        if (
+          hostname !== "localhost" &&
+          hostname !== "127.0.0.1" &&
+          !hostname.includes("192.168.") &&
+          !hostname.includes("10.")
+        ) {
+          // 线上环境 - 使用Render服务器地址
+          // 请将下面的地址替换为您实际部署的Render服务器地址
+          return "wss://easypdf-ws.onrender.com";
+        }
+        // 本地开发环境
+        return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
+          window.location.host
+        }`;
       }
 
       // 初始化WebSocket连接
@@ -1552,8 +1570,8 @@
         }
 
         currentSessionId = generateSessionId();
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}/ws?session=${currentSessionId}&type=main&window=${getCurrentWindowId()}`;
+        const wsServer = getWsServer();
+        const wsUrl = `${wsServer}/ws?session=${currentSessionId}&type=main&window=${getCurrentWindowId()}`;
 
         console.log("=== 尝试连接WebSocket ===");
         console.log("Session ID:", currentSessionId);
@@ -1564,7 +1582,7 @@
         if (window.location.protocol === "file:") {
           console.error("错误：请通过服务器访问页面，而不是直接打开文件！");
           alert(
-            "请通过服务器访问页面（http://localhost:8000），而不是直接打开文件！",
+            "请通过服务器访问页面（http://localhost:8000），而不是直接打开文件！"
           );
           return;
         }
@@ -1755,7 +1773,7 @@
               "width:",
               command.width,
               "height:",
-              command.height,
+              command.height
             );
 
             // 检查条件
@@ -1772,19 +1790,19 @@
                   "缓存手机容器尺寸:",
                   cachedPhoneWidth,
                   "x",
-                  cachedPhoneHeight,
+                  cachedPhoneHeight
                 );
               }
               console.log(
                 "调用renderAndSendPDFImage - 尺寸:",
                 cachedPhoneWidth || command.width,
                 "x",
-                cachedPhoneHeight || command.height,
+                cachedPhoneHeight || command.height
               );
               renderAndSendPDFImage(
                 cachedPhoneWidth || command.width,
                 cachedPhoneHeight || command.height,
-                command.orientation,
+                command.orientation
               );
             } else {
               console.warn(
@@ -1800,7 +1818,7 @@
                 hasHeight,
                 "(value:",
                 command.height,
-                ")",
+                ")"
               );
 
               // 如果只是尺寸为0，延迟重试
@@ -1819,13 +1837,13 @@
             if (command.screens && Array.isArray(command.screens)) {
               const myWindowId = getCurrentWindowId();
               const myScreen = command.screens.find(
-                (s) => s.windowId === myWindowId,
+                (s) => s.windowId === myWindowId
               );
               if (myScreen) {
                 updateScreenStatusUI(
                   myScreen.isMain,
                   myScreen.name,
-                  command.totalScreens,
+                  command.totalScreens
                 );
                 // 根据状态切换页面
                 navigateToScreenPage(myScreen.isMain);
@@ -1835,7 +1853,7 @@
               updateScreenStatusUI(
                 command.isMain,
                 command.screenName,
-                command.totalScreens,
+                command.totalScreens
               );
               navigateToScreenPage(command.isMain);
             }
@@ -1852,13 +1870,13 @@
             if (command.screens && Array.isArray(command.screens)) {
               const myWindowId = getCurrentWindowId();
               const myScreen = command.screens.find(
-                (s) => s.windowId === myWindowId,
+                (s) => s.windowId === myWindowId
               );
               if (myScreen) {
                 updateScreenStatusUI(
                   myScreen.isMain,
                   myScreen.name,
-                  command.totalScreens || totalScreens,
+                  command.totalScreens || totalScreens
                 );
               }
             } else {
@@ -1866,7 +1884,7 @@
               updateScreenStatusUI(
                 true,
                 "主屏",
-                command.totalScreens || totalScreens,
+                command.totalScreens || totalScreens
               );
             }
             break;
@@ -1876,13 +1894,13 @@
             if (command.screens && Array.isArray(command.screens)) {
               const myWindowId = getCurrentWindowId();
               const myScreen = command.screens.find(
-                (s) => s.windowId === myWindowId,
+                (s) => s.windowId === myWindowId
               );
               if (myScreen) {
                 updateScreenStatusUI(
                   myScreen.isMain,
                   myScreen.name,
-                  command.totalScreens,
+                  command.totalScreens
                 );
               }
             } else {
@@ -1890,7 +1908,7 @@
               updateScreenStatusUI(
                 command.isMain,
                 command.screenName,
-                command.totalScreens,
+                command.totalScreens
               );
             }
             break;
@@ -1953,7 +1971,7 @@
         if (controllerModal) {
           console.log(
             "controllerModal当前display:",
-            controllerModal.style.display,
+            controllerModal.style.display
           );
         } else {
           console.error("controllerModal元素不存在！");
@@ -1966,7 +1984,7 @@
           if (controllerModal) {
             console.log(
               "显示后controllerModal的display:",
-              controllerModal.style.display,
+              controllerModal.style.display
             );
           }
         }, 100);
@@ -1983,7 +2001,7 @@
       function initControllerButton() {
         const controllerBtn = document.getElementById("controllerBtn");
         const closeControllerOverlay = document.getElementById(
-          "closeControllerOverlay",
+          "closeControllerOverlay"
         );
         const controllerOverlay = document.getElementById("controllerOverlay");
 
@@ -2002,7 +2020,7 @@
         if (closeControllerOverlay) {
           closeControllerOverlay.removeEventListener(
             "click",
-            hideControllerModal,
+            hideControllerModal
           );
           closeControllerOverlay.addEventListener("click", hideControllerModal);
         }
@@ -2183,7 +2201,7 @@
               localStorage.setItem(cacheKey, dataUrl);
               console.log("二维码已缓存");
             }
-          },
+          }
         );
       }
 
@@ -2238,7 +2256,7 @@
         viewportLeft,
         viewportTop,
         viewportWidth,
-        viewportHeight,
+        viewportHeight
       ) {
         if (!imageData || imageData.length < 100) {
           console.error("无效的图片数据");
@@ -2253,7 +2271,7 @@
 
         if (imageData.length > 2000000) {
           console.warn(
-            "图片数据过大(" + imageData.length + "字节)，尝试降低质量",
+            "图片数据过大(" + imageData.length + "字节)，尝试降低质量"
           );
           quality = 0.7;
           // 注意：这里无法重新生成，因为没有canvas引用，直接发送原始数据
@@ -2281,7 +2299,7 @@
       async function renderAndSendPDFImage(
         phoneWidth,
         phoneHeight,
-        orientation,
+        orientation
       ) {
         if (!currentPage) return;
 
@@ -2340,7 +2358,7 @@
           "x",
           canvasH,
           "缩放比例:",
-          renderScale,
+          renderScale
         );
 
         // 检查canvas尺寸是否在合理范围内
@@ -2426,7 +2444,7 @@
           "页面尺寸:",
           pageWidth,
           "x",
-          pageHeight,
+          pageHeight
         );
 
         // 检查数据大小，如果太大则降低质量
@@ -2437,7 +2455,7 @@
         if (imageData.length > 2000000) {
           // 超过2MB，降低质量
           console.warn(
-            "图片数据过大(" + imageData.length + "字节)，尝试降低质量",
+            "图片数据过大(" + imageData.length + "字节)，尝试降低质量"
           );
           quality = 0.7;
           // 在转换前，确保背景色正确填充
@@ -2455,7 +2473,7 @@
         if (finalImageData.length > 4000000) {
           // 仍然超过4MB，再次降低质量
           console.warn(
-            "图片仍然过大(" + finalImageData.length + "字节)，继续降低质量",
+            "图片仍然过大(" + finalImageData.length + "字节)，继续降低质量"
           );
           quality = 0.5;
           // 在转换前，确保背景色正确填充
@@ -2481,7 +2499,7 @@
           viewportLeft,
           viewportTop,
           viewportWidth,
-          viewportHeight,
+          viewportHeight
         );
       }
 
@@ -2533,12 +2551,12 @@
         // 重置最佳比例为全屏显示比例
         localStorage.setItem(
           `easyPdfBestScale_${currentFileName}`,
-          fullScreenScale.toString(),
+          fullScreenScale.toString()
         );
         // 清除用户保存标记
         localStorage.setItem(
           `easyPdfUserSavedBestScale_${currentFileName}`,
-          "false",
+          "false"
         );
 
         // 更新最佳比例的暂存渲染结果
@@ -2578,7 +2596,7 @@
 
         // 从本地存储获取最佳比例
         const savedBestScale = localStorage.getItem(
-          `easyPdfBestScale_${currentFileName}`,
+          `easyPdfBestScale_${currentFileName}`
         );
         if (savedBestScale) {
           scale = parseFloat(savedBestScale);
@@ -2687,7 +2705,7 @@
               JSON.stringify({
                 type: "loginStatus",
                 isLoggedIn: true,
-              }),
+              })
             );
           }
 
@@ -2740,7 +2758,7 @@
         if (data && data.best_scale) {
           localStorage.setItem(
             `easyPdfBestScale_${currentFileName}`,
-            data.best_scale,
+            data.best_scale
           );
         }
       }
@@ -3035,7 +3053,7 @@
 
         // 检查是否有保存的最佳比例
         const bestScale = localStorage.getItem(
-          `easyPdfBestScale_${currentFileName}`,
+          `easyPdfBestScale_${currentFileName}`
         );
         let finalScale = newScale; // 默认使用全屏显示比例
 
@@ -3190,7 +3208,7 @@
 
           // 关闭二维码容器
           const qrcodeContainer = document.getElementById(
-            "mainQrcodeContainer",
+            "mainQrcodeContainer"
           );
           if (qrcodeContainer) {
             qrcodeContainer.parentElement.style.display = "none";
@@ -3291,7 +3309,9 @@
           }
 
           const ext = file.name.split(".").pop();
-          const storageName = `${Date.now()}_${Math.random().toString(36).substr(2)}.${ext}`;
+          const storageName = `${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2)}.${ext}`;
           const { error: uploadErr } = await supabaseClient.storage
             .from("PDFs")
             .upload(storageName, file);
@@ -3361,7 +3381,7 @@
               if (removeErr) {
                 console.error(
                   `删除历史记录失败: ${file.storage_path}`,
-                  removeErr,
+                  removeErr
                 );
               }
             }
@@ -3414,7 +3434,7 @@
           await loadPDFFromBuffer(
             currentArrayBuffer,
             currentFileName,
-            currentStoragePath,
+            currentStoragePath
           );
           return;
         }
@@ -3542,7 +3562,7 @@
       const BEST_SCALE_THRESHOLD = 0.02; // 最佳比例阈值，当差异小于2%时认为处于最佳比例状态
       function checkBestScaleStatus() {
         const bestScale = localStorage.getItem(
-          `easyPdfBestScale_${currentFileName}`,
+          `easyPdfBestScale_${currentFileName}`
         );
         const icon = document.getElementById("bestScaleIcon");
         if (!bestScale || !icon || !currentPage) return;
@@ -3772,7 +3792,7 @@
             renderX,
             renderY,
             renderWidth,
-            renderHeight,
+            renderHeight
           );
 
           // 更新视口指示器，显示焦点位置
@@ -3780,7 +3800,7 @@
             renderX / dpr,
             renderY / dpr,
             renderWidth / dpr,
-            renderHeight / dpr,
+            renderHeight / dpr
           );
         } else if (currentPage) {
           // 如果fullContentRender不存在，直接渲染PDF页面到导航画布
@@ -3811,7 +3831,7 @@
                 renderX / dpr,
                 renderY / dpr,
                 renderWidth / dpr,
-                renderHeight / dpr,
+                renderHeight / dpr
               );
             });
         }
@@ -3822,7 +3842,7 @@
         renderX,
         renderY,
         renderWidth,
-        renderHeight,
+        renderHeight
       ) {
         if (!viewportIndicator) return;
         // 取消焦点显示
@@ -3941,7 +3961,7 @@
         const halfHorizontalDivisions = Math.ceil(centerY / baseUnit);
 
         console.log(
-          `网格参数: 屏幕宽度=${screenWidth}, 屏幕高度=${screenHeight}, 总划分=${totalDivisions}, 基础单位=${baseUnit}, 粗线中心距=${majorLineSpacing}, 中心X=${centerX}, 中心Y=${centerY}`,
+          `网格参数: 屏幕宽度=${screenWidth}, 屏幕高度=${screenHeight}, 总划分=${totalDivisions}, 基础单位=${baseUnit}, 粗线中心距=${majorLineSpacing}, 中心X=${centerX}, 中心Y=${centerY}`
         );
 
         // 创建横向网格线 - 29份，每4份的分界线清晰，以屏幕中心为原点
@@ -3970,7 +3990,7 @@
             horizontalLine.style.zIndex = isMajorLine ? "101" : "100";
             gridContainer.appendChild(horizontalLine);
             console.log(
-              `创建横向网格线 at y=${y}px, ${isMajorLine ? "主线条" : "次线条"}`,
+              `创建横向网格线 at y=${y}px, ${isMajorLine ? "主线条" : "次线条"}`
             );
           }
         }
@@ -3997,7 +4017,7 @@
             verticalLine.style.zIndex = isMajorLine ? "101" : "100";
             gridContainer.appendChild(verticalLine);
             console.log(
-              `创建竖向网格线 at x=${x}px, ${isMajorLine ? "主线条" : "次线条"}`,
+              `创建竖向网格线 at x=${x}px, ${isMajorLine ? "主线条" : "次线条"}`
             );
           }
         }
@@ -4241,19 +4261,19 @@
         // 计算边长
         const side1 = Math.sqrt(
           Math.pow(points[1].x - points[0].x, 2) +
-            Math.pow(points[1].y - points[0].y, 2),
+            Math.pow(points[1].y - points[0].y, 2)
         );
         const side2 = Math.sqrt(
           Math.pow(points[2].x - points[1].x, 2) +
-            Math.pow(points[2].y - points[1].y, 2),
+            Math.pow(points[2].y - points[1].y, 2)
         );
         const side3 = Math.sqrt(
           Math.pow(points[3].x - points[2].x, 2) +
-            Math.pow(points[3].y - points[2].y, 2),
+            Math.pow(points[3].y - points[2].y, 2)
         );
         const side4 = Math.sqrt(
           Math.pow(points[0].x - points[3].x, 2) +
-            Math.pow(points[0].y - points[3].y, 2),
+            Math.pow(points[0].y - points[3].y, 2)
         );
 
         // 检查边长是否相近（允许5%的误差）
@@ -4452,7 +4472,7 @@
             scaleAtPoint(
               pendingWheelScale,
               pendingWheelCenter.x,
-              pendingWheelCenter.y,
+              pendingWheelCenter.y
             );
             pendingWheelScale = null;
             pendingWheelCenter = null;
@@ -4791,12 +4811,12 @@
           // 重置最佳比例为全屏显示比例
           localStorage.setItem(
             `easyPdfBestScale_${currentFileName}`,
-            fullScreenScale.toString(),
+            fullScreenScale.toString()
           );
           // 清除用户保存标记
           localStorage.setItem(
             `easyPdfUserSavedBestScale_${currentFileName}`,
-            "false",
+            "false"
           );
 
           // 更新最佳比例的暂存渲染结果
@@ -4847,7 +4867,7 @@
           localStorage.setItem(`easyPdfBestScale_${currentFileName}`, scale);
           localStorage.setItem(
             `easyPdfUserSavedBestScale_${currentFileName}`,
-            "true",
+            "true"
           );
 
           // 重新计算并更新最佳比例的暂存渲染结果
@@ -4934,7 +4954,7 @@
               lastBestScaleTouchTime = currentTime;
             }
           },
-          { passive: false, capture: true },
+          { passive: false, capture: true }
         );
 
         // 触摸结束事件
@@ -4951,7 +4971,7 @@
               bestScaleTouchTimer = null;
             }
           },
-          { passive: true, capture: true },
+          { passive: true, capture: true }
         );
 
         // 触摸取消事件
@@ -4968,7 +4988,7 @@
               bestScaleTouchTimer = null;
             }
           },
-          { passive: true, capture: true },
+          { passive: true, capture: true }
         );
 
         // 显示提示信息
@@ -5003,7 +5023,7 @@
             },
             {
               onConflict: "user_id,file_name",
-            },
+            }
           );
 
           if (error) {
@@ -5145,7 +5165,7 @@
 
           isAnimating = true;
           const bestScale = localStorage.getItem(
-            `easyPdfBestScale_${currentFileName}`,
+            `easyPdfBestScale_${currentFileName}`
           );
           const icon = document.getElementById("bestScaleIcon");
 
@@ -5268,7 +5288,7 @@
           const isTargetFullContent =
             Math.abs(targetScale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
           const bestScale = localStorage.getItem(
-            `easyPdfBestScale_${currentFileName}`,
+            `easyPdfBestScale_${currentFileName}`
           );
           const savedBestScale = bestScale
             ? parseFloat(bestScale)
@@ -5334,7 +5354,7 @@
                     drawX,
                     drawY,
                     fullWidth,
-                    fullHeight,
+                    fullHeight
                   );
                 } catch (e) {
                   console.error("动画渲染失败", e);
@@ -5367,7 +5387,7 @@
                       drawX,
                       drawY,
                       bestWidth,
-                      bestHeight,
+                      bestHeight
                     );
 
                     // 重置透明度
@@ -5397,7 +5417,7 @@
                       drawX,
                       drawY,
                       fullWidth,
-                      fullHeight,
+                      fullHeight
                     );
                   } catch (e) {
                     console.error("动画渲染失败", e);

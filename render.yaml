@@ -1,0 +1,19 @@
+# Render 部署配置文件
+# 用于部署 WebSocket 服务器到 Render
+
+services:
+  - type: web
+    name: easypdf-ws
+    env: node
+    region: singapore # 新加坡节点，对亚洲用户延迟较低
+    plan: free # 免费计划
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: PORT
+        value: 10000
+      - key: WS_SERVER
+        value: wss://easypdf-ws.onrender.com

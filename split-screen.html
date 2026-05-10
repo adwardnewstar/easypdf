@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -160,9 +160,7 @@
 
       .top-bar,
       .top-bar.show {
-        transition:
-          transform 0.3s ease-in-out,
-          opacity 0.3s ease-in-out;
+        transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
       }
 
       .top-bar.show {
@@ -192,9 +190,7 @@
         justify-content: center;
         cursor: pointer;
         color: #333333;
-        transition:
-          transform 0.2s ease,
-          box-shadow 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
         font-size: 20px;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         transform: translateZ(0);
@@ -747,7 +743,7 @@
         "sb_publishable_bmgWwgQxTGMf0r8tyqyTHg__3g7osn1";
       const supabaseClient = supabase.createClient(
         SUPABASE_URL,
-        SUPABASE_ANON_KEY,
+        SUPABASE_ANON_KEY
       );
 
       // DOM元素
@@ -782,16 +778,39 @@
       // WebSocket连接
       let ws = null;
 
+      // WebSocket服务器地址配置
+      function getWsServer() {
+        // 如果存在全局配置变量，使用它
+        if (window.__WS_SERVER__) {
+          return window.__WS_SERVER__;
+        }
+        // 检查是否是Netlify部署环境
+        const hostname = window.location.hostname;
+        if (
+          hostname !== "localhost" &&
+          hostname !== "127.0.0.1" &&
+          !hostname.includes("192.168.") &&
+          !hostname.includes("10.")
+        ) {
+          // 线上环境 - 使用Render服务器地址
+          // 请将下面的地址替换为您实际部署的Render服务器地址
+          return "wss://easypdf-ws.onrender.com";
+        }
+        // 本地开发环境
+        return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
+          window.location.host
+        }`;
+      }
+
       // 初始化WebSocket
       function initWebSocket() {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host;
+        const wsServer = getWsServer();
         // 从URL参数获取session
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get("session") || "default";
         const windowId = urlParams.get("window") || getCurrentWindowId();
         // 添加session和type参数
-        const url = `${protocol}//${host}/ws?session=${sessionId}&type=main&window=${windowId}`;
+        const url = `${wsServer}/ws?session=${sessionId}&type=main&window=${windowId}`;
 
         ws = new WebSocket(url);
 
@@ -821,7 +840,7 @@
         const myWindowId = getCurrentWindowId();
         if (command.screens && Array.isArray(command.screens)) {
           const myScreen = command.screens.find(
-            (s) => s.windowId === myWindowId,
+            (s) => s.windowId === myWindowId
           );
           // 如果是主屏，不处理（让主屏自己处理）
           if (myScreen && myScreen.isMain) {
@@ -962,7 +981,7 @@
           0,
           0,
           targetCanvas.width,
-          targetCanvas.height,
+          targetCanvas.height
         );
         const data = imageData.data;
 
@@ -1055,7 +1074,7 @@
           ws.send(
             JSON.stringify({
               type: "getLoginStatus",
-            }),
+            })
           );
         }
       }
@@ -1233,7 +1252,7 @@
       ratioConfirmBtn.addEventListener("click", () => {
         // 应用比例设置（这里可以添加实际的比例应用逻辑）
         console.log(
-          "应用比例设置 - X: " + xSlider.value + "%, Y: " + ySlider.value + "%",
+          "应用比例设置 - X: " + xSlider.value + "%, Y: " + ySlider.value + "%"
         );
         ratioOverlay.classList.remove("show");
 
@@ -1528,7 +1547,7 @@
             if (message.screens && Array.isArray(message.screens)) {
               const myWindowId = getCurrentWindowId();
               const myScreen = message.screens.find(
-                (s) => s.windowId === myWindowId,
+                (s) => s.windowId === myWindowId
               );
               if (myScreen && myScreen.isMain) {
                 // 如果变成主屏，跳转到index.html
@@ -1554,14 +1573,14 @@
               hasController = true;
               console.log(
                 "✅ 分屏页面更新状态 - hasController:",
-                hasController,
+                hasController
               );
               hideNoControllerAlert();
             } else {
               hasController = false;
               console.log(
                 "❌ 分屏页面更新状态 - hasController:",
-                hasController,
+                hasController
               );
               showNoControllerAlert();
             }

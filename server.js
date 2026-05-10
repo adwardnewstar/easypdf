@@ -7,12 +7,25 @@ const { createClient } = require("@supabase/supabase-js");
 const PORT = process.env.PORT || 8000;
 
 // Supabase 配置（从环境变量获取）
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://zwnluqynchoidpiittdp.supabase.co";
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || "https://zwnluqynchoidpiittdp.supabase.co";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 创建HTTP服务器
 const server = http.createServer(async (req, res) => {
+  // 设置 CORS 头，允许来自任何域的请求
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // 处理 OPTIONS 预检请求
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   let pathname = req.url.split("?")[0];
 
   console.log("收到请求:", req.url, "pathname:", pathname);
@@ -77,7 +90,9 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${encodeURIComponent(path.basename(decodedPath))}"`,
+        "Content-Disposition": `inline; filename="${encodeURIComponent(
+          path.basename(decodedPath)
+        )}"`,
         "Content-Length": buffer.byteLength,
       });
       res.end(Buffer.from(buffer));
@@ -90,6 +105,16 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // 健康检查端点（用于 Render 监控）
+  if (pathname === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({ status: "ok", timestamp: new Date().toISOString() })
+    );
+    return;
+  }
+
+  // 静态文件服务
   let filePath = "." + pathname;
 
   if (filePath === "./") {
@@ -162,7 +187,7 @@ wss.on("connection", (ws, req) => {
   const windowId = url.searchParams.get("window"); // 窗口ID，用于多屏幕
 
   console.log(
-    `解析参数 - session: ${sessionId}, type: ${type}, windowId: ${windowId}`,
+    `解析参数 - session: ${sessionId}, type: ${type}, windowId: ${windowId}`
   );
 
   if (!sessionId) {
@@ -190,20 +215,20 @@ wss.on("connection", (ws, req) => {
     // 添加到主页面列表
     clients[sessionId].mains.push(ws);
     console.log(
-      `主页面已连接: ${sessionId}, windowId: ${windowId}, 总屏幕数: ${clients[sessionId].mains.length}`,
+      `主页面已连接: ${sessionId}, windowId: ${windowId}, 总屏幕数: ${clients[sessionId].mains.length}`
     );
 
     // 主动发送当前登录状态给新连接的主页面
     const currentLoginStatus = loginStatus[sessionId] || false;
     console.log(
-      `[登录同步] 主页面连接，主动发送当前登录状态: ${currentLoginStatus}`,
+      `[登录同步] 主页面连接，主动发送当前登录状态: ${currentLoginStatus}`
     );
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
           type: "loginStatus",
           isLoggedIn: currentLoginStatus,
-        }),
+        })
       );
     }
   } else if (type === "controller") {
@@ -222,14 +247,14 @@ wss.on("connection", (ws, req) => {
           JSON.stringify({
             type: "controllerConnected",
             message: "手柄已连接",
-          }),
+          })
         );
       });
       clients[sessionId].controller.send(
         JSON.stringify({
           type: "connected",
           message: "已连接到主页面",
-        }),
+        })
       );
     }
   }
@@ -250,7 +275,9 @@ wss.on("connection", (ws, req) => {
         // 广播到所有连接的客户端
         console.log(`[登录同步] 广播登录状态到所有客户端: ${data.isLoggedIn}`);
         console.log(
-          `[登录同步] 主页面数量: ${clients[sessionId].mains.length}, 是否有手柄: ${!!clients[sessionId].controller}`,
+          `[登录同步] 主页面数量: ${
+            clients[sessionId].mains.length
+          }, 是否有手柄: ${!!clients[sessionId].controller}`
         );
 
         // 发送给所有主页面连接（包括发送者）
@@ -260,7 +287,9 @@ wss.on("connection", (ws, req) => {
             console.log(`[登录同步] 已发送登录状态到主页面 ${index + 1}`);
           } else {
             console.log(
-              `[登录同步] 主页面 ${index + 1} 连接未打开，状态: ${mainWs.readyState}`,
+              `[登录同步] 主页面 ${index + 1} 连接未打开，状态: ${
+                mainWs.readyState
+              }`
             );
           }
         });
@@ -271,7 +300,7 @@ wss.on("connection", (ws, req) => {
         }
       } else if (data.type === "getLoginStatus") {
         console.log(
-          `[登录同步] 收到登录状态请求，当前状态: ${loginStatus[sessionId]}`,
+          `[登录同步] 收到登录状态请求，当前状态: ${loginStatus[sessionId]}`
         );
         // 直接返回当前登录状态给请求者
         if (ws.readyState === WebSocket.OPEN) {
@@ -279,10 +308,12 @@ wss.on("connection", (ws, req) => {
             JSON.stringify({
               type: "loginStatus",
               isLoggedIn: loginStatus[sessionId] || false,
-            }),
+            })
           );
           console.log(
-            `[登录同步] 已返回登录状态给请求者: ${loginStatus[sessionId] || false}`,
+            `[登录同步] 已返回登录状态给请求者: ${
+              loginStatus[sessionId] || false
+            }`
           );
         } else {
           console.log(`[登录同步] 连接未打开，无法返回登录状态`);
@@ -291,7 +322,7 @@ wss.on("connection", (ws, req) => {
         // 转发消息
         if (type === "controller" && clients[sessionId].mains.length > 0) {
           console.log(
-            `转发消息到所有主页面: ${data.type}, 数量: ${clients[sessionId].mains.length}`,
+            `转发消息到所有主页面: ${data.type}, 数量: ${clients[sessionId].mains.length}`
           );
           // 发送给所有主页面连接
           clients[sessionId].mains.forEach((mainWs) => {
@@ -305,7 +336,9 @@ wss.on("connection", (ws, req) => {
         } else {
           console.warn(`无法转发消息: ${data.type} - 目标客户端未连接`);
           console.warn(
-            `mains数量: ${clients[sessionId]?.mains?.length || 0}, controller已连接: ${!!clients[sessionId]?.controller}`,
+            `mains数量: ${
+              clients[sessionId]?.mains?.length || 0
+            }, controller已连接: ${!!clients[sessionId]?.controller}`
           );
         }
       }
@@ -328,7 +361,7 @@ wss.on("connection", (ws, req) => {
         clients[sessionId].mains.splice(index, 1);
       }
       console.log(
-        `主页面已断开: ${sessionId}, 剩余屏幕数: ${clients[sessionId].mains.length}`,
+        `主页面已断开: ${sessionId}, 剩余屏幕数: ${clients[sessionId].mains.length}`
       );
     } else {
       clients[sessionId].controller = null;
@@ -348,6 +381,8 @@ wss.on("connection", (ws, req) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`服务器运行在 http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`服务器运行在 http://0.0.0.0:${PORT}`);
+  console.log(`WebSocket 服务器已启动`);
+  console.log(`环境: ${process.env.NODE_ENV || "development"}`);
 });
