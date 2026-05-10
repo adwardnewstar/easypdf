@@ -1562,24 +1562,26 @@
         }
 
         // WebSocket服务器地址配置
+        // 策略：优先连接局域网内的本地服务器，如果连不上则使用线上服务器
+        // 线上页面从 Netlify 加载，局域网内设备通过本地 server.js 通信
         function getWsServer() {
           // 如果存在全局配置变量，使用它
           if (window.__WS_SERVER__) {
             return window.__WS_SERVER__;
           }
-          // 检查是否是Netlify部署环境
-          const hostname = window.location.hostname;
-          if (
-            hostname !== "localhost" &&
-            hostname !== "127.0.0.1" &&
-            !hostname.includes("192.168.") &&
-            !hostname.includes("10.")
-          ) {
-            // 线上环境 - 使用Render服务器地址
-            // 请将下面的地址替换为您实际部署的Render服务器地址
-            return "wss://easypdf-ws.onrender.com";
+          // 检查 URL 参数中是否指定了服务器地址
+          const urlParams = new URLSearchParams(window.location.search);
+          const serverParam = urlParams.get("server");
+          if (serverParam) {
+            return serverParam;
           }
-          // 本地开发环境
+          // 检查 localStorage 中是否保存了服务器地址
+          const savedServer = localStorage.getItem("easypdf_ws_server");
+          if (savedServer) {
+            return savedServer;
+          }
+          // 默认：尝试连接本地局域网服务器
+          // 如果页面是通过内网穿透或线上访问的，这里会自动使用当前域名
           return `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
             window.location.host
           }`;
