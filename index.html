@@ -7,7 +7,8 @@
       content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>EasyPDF</title>
-    <link rel="icon" type="image/jpg" href="assets/icon/easypdf.jpg" />
+    <link rel="icon" type="image/jpg" href="assets/icon/easypdfmain.jpg" />
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <style>
       * {
         margin: 0;
@@ -46,7 +47,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        background: #1a1a1a;
+        background: #f5f5f5;
         cursor: grab;
         z-index: 1;
       }
@@ -74,6 +75,14 @@
         box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
         background: #fff;
         touch-action: none;
+        opacity: 1;
+        transition: opacity 0.5s ease-out;
+      }
+      canvas.fade-in {
+        opacity: 1;
+      }
+      canvas.fade-out {
+        opacity: 0;
       }
 
       /* 顶部磨砂工具栏 (透明度0.1) */
@@ -91,8 +100,32 @@
         justify-content: center;
         align-items: center;
         /* 强制硬件加速，减少残影 */
-        transform: translateZ(0);
-        will-change: transform;
+        transform: translateY(-100%);
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      .top-bar,
+      .top-bar.show {
+        transition:
+          transform 0.3s ease-in-out,
+          opacity 0.3s ease-in-out;
+      }
+      .top-bar.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .top-bar.voice-active .circle-btn:not(#thumbCard) {
+        opacity: 0.3;
+        transform: scale(0.95);
+        filter: blur(2px);
+        transition: all 0.5s ease;
+      }
+      .bottom-toolbar.voice-active .fixed-btn:not(#thumbCard),
+      .bottom-toolbar.voice-active .scale-btn {
+        opacity: 0.3;
+        transform: scale(0.95);
+        filter: blur(2px);
+        transition: all 0.5s ease;
       }
 
       .toolbar-group {
@@ -172,40 +205,36 @@
         display: block;
       }
 
-      /* 上传反馈颜色 */
-      .scale-input {
+      /* 缩放按钮样式 */
+      .scale-btn {
         background: rgba(20, 20, 28, 0.75);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.25);
         border-radius: 9999px;
         padding: 0 3vh;
-        height: 12.5vh;
-        min-height: 44px;
+        height: 8.33vh;
+        min-height: 30px;
         width: 18.75vh;
         min-width: 66px;
         color: white;
-        font-size: 4.17vh;
+        font-size: 3vh;
+        transition:
+          transform 0.05s,
+          opacity 0.2s;
         font-weight: 500;
         text-align: center;
         outline: none;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-        /* 取消上下箭头 */
-        appearance: none;
-        -webkit-appearance: none;
-        -moz-appearance: textfield;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
         /* 禁止文本选择 */
         user-select: none;
         -webkit-user-select: none;
-        /* 禁止指针事件 */
-        pointer-events: none;
+        cursor: pointer;
         /* 强制硬件加速，减少残影 */
         transform: translateZ(0);
         will-change: transform;
+        font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
       }
-      .scale-input::-webkit-outer-spin-button,
-      .scale-input::-webkit-inner-spin-button {
-        appearance: none;
-        -webkit-appearance: none;
-        margin: 0;
+      .scale-btn:active {
+        transform: scale(0.96);
       }
 
       /* 缩放控制条 */
@@ -268,15 +297,83 @@
           transform: translate(-50%, -50%) scale(0.8);
         }
       }
-      .scale-input:focus {
-        border-color: #ff9800;
+      @keyframes fadeInScale {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
+      @keyframes fadeOutScale {
+        from {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.9);
+        }
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+      .scale-btn:focus {
+        outline: none;
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+
+      /* 底部工具栏 - 三个元素水平中心对齐，宽度为屏幕的3/5 */
+      .bottom-toolbar {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%) translateY(200%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 60vw;
+        min-width: 280px;
+        max-width: 480px;
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+        z-index: 180;
+        transition: transform 0.3s ease-out;
+      }
+      .bottom-toolbar.show {
+        transform: translateX(-50%) translateY(0);
+      }
+      .bottom-toolbar #lockBtn {
+        margin: 0;
+        padding: 0;
+      }
+      .bottom-toolbar #scaleInput {
+        margin: 0;
+        padding: 0;
+      }
+      .bottom-toolbar #thumbCard {
+        margin: 0;
+        padding: 0;
       }
 
       /* 固定按钮 (左锁定，右缩略图) */
       .fixed-btn {
-        position: fixed;
-        width: 66px;
-        height: 66px;
+        width: 12.5vh;
+        height: 12.5vh;
+        min-width: 44px;
+        min-height: 44px;
         border-radius: 9999px;
         background: #c3c3c3;
         backdrop-filter: blur(16px);
@@ -285,7 +382,6 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        z-index: 180;
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
         font-size: 28px;
         color: white;
@@ -482,13 +578,15 @@
       }
 
       /* 锁定模式隐藏除锁定按钮外的所有控件 */
-      .locked-mode .top-bar,
       .locked-mode .thumb-card,
       .locked-mode .history-menu {
         display: none !important;
       }
       .locked-mode #thumbCard {
         display: flex !important;
+        opacity: 0.5;
+      }
+      .locked-mode #scaleInput {
         opacity: 0.5;
       }
       .locked-mode {
@@ -507,26 +605,107 @@
         padding: 12px 24px;
         border-radius: 60px;
         font-size: 15px;
-        font-weight: 500;
-        pointer-events: none;
-        z-index: 300;
-        white-space: nowrap;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      .qrcode-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 16px;
+      }
+      .url-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: white;
+        font-size: 12px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .copy-btn {
+        width: 100%;
+        padding: 10px;
+        background: #ff9800;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        margin-bottom: 12px;
+        transition: background 0.2s;
+      }
+      .copy-btn:hover {
+        background: #f57c00;
+      }
+      .status-text {
+        text-align: center;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .status-text.connected {
+        color: #4caf50;
+      }
+
+      /* 省略号动画 */
+      .loading-dots {
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: center;
       }
-      .loading-icon {
-        width: 20px;
-        height: 20px;
-        fill: #c2c2c2;
-        animation: spin 1s linear infinite;
+
+      .loading-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #c2c2c2;
+        margin: 0 2px;
+        opacity: 0;
+        animation: dotFade 1.4s infinite ease-in-out;
       }
+
+      .loading-dot:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .loading-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .loading-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes dotFade {
+        0%,
+        80%,
+        100% {
+          opacity: 0;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+
       @keyframes spin {
         from {
           transform: rotate(0deg);
         }
         to {
-          transform: rotate(360deg);
+          transform: rotate(-360deg);
+        }
+      }
+
+      /* 流动渐变动画 - 用于指令执行中提示 */
+      @keyframes flow {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
         }
       }
 
@@ -539,16 +718,13 @@
           min-width: 44px;
           min-height: 44px;
         }
-        /* 输入框：高度屏幕高度1/8，宽高比1:1.5 */
-        .scale-input {
-          height: 12.5vh;
+        /* 缩放按钮：高度屏幕高度的1/12，宽高比1:1.5 */
+        .scale-btn {
+          height: 8.33vh;
           width: 18.75vh;
-          min-width: 66px;
-          min-height: 44px;
-          font-size: 4.17vh;
-          border-radius: 9999px;
-          /* 最小字体大小 */
-          font-size: max(4.17vh, 12px);
+          min-width: 44px;
+          min-height: 30px;
+          font-size: 3vh;
         }
         /* 锁定和导航按钮：屏幕高度1/7 */
         .fixed-btn {
@@ -617,11 +793,10 @@
           height: 40px;
           font-size: 18px;
         }
-        .scale-input {
+        .scale-btn {
           width: 60px;
-          height: 40px;
-          font-size: 13.3px;
-          border-radius: 9999px;
+          height: 27px;
+          font-size: 12px;
         }
         .fixed-btn {
           width: 60px;
@@ -650,6 +825,100 @@
         display: flex;
         opacity: 1;
       }
+
+      /* 手柄连接弹窗 */
+      .controller-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .controller-overlay.show {
+        display: flex;
+        opacity: 1;
+      }
+      .controller-form {
+        background: #c2c2c2;
+        backdrop-filter: blur(20px);
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4vh;
+        width: 40vh;
+        min-width: 280px;
+        max-width: 90vw;
+        height: auto;
+        max-height: 80vh;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2vh;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+      .controller-overlay.show .controller-form {
+        transform: scale(1);
+      }
+      .controller-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      }
+      .controller-title {
+        color: #333333;
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .controller-close-btn {
+        background: none;
+        border: none;
+        color: rgba(0, 0, 0, 0.6);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+        transition: color 0.2s ease;
+      }
+      .controller-close-btn:hover {
+        color: #333333;
+      }
+      .controller-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .controller-option {
+        padding: 14px 20px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+        color: #333333;
+        font-size: 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+      }
+      .controller-option:hover {
+        background: rgba(0, 0, 0, 0.18);
+        transform: translateY(-2px);
+      }
+      .controller-option:active {
+        transform: translateY(0);
+      }
+
       .login-form {
         background: #c2c2c2;
         backdrop-filter: blur(20px);
@@ -826,6 +1095,25 @@
       </div>
     </div>
 
+    <!-- 手柄连接弹窗 -->
+    <div class="controller-overlay" id="controllerOverlay">
+      <div class="controller-form">
+        <div class="controller-header">
+          <h3 class="controller-title">连接模式</h3>
+          <button class="controller-close-btn" id="closeControllerOverlay">
+            ×
+          </button>
+        </div>
+        <div class="controller-body">
+          <div class="controller-option" id="hostOption">主机</div>
+          <div class="controller-option" id="remoteOption">遥控</div>
+          <div class="controller-option" id="split1Option">分屏1</div>
+          <div class="controller-option" id="split2Option">分屏2</div>
+          <div class="controller-option" id="split3Option">分屏3</div>
+        </div>
+      </div>
+    </div>
+
     <div class="app" id="app">
       <div class="canvas-area" id="canvasArea">
         <div class="canvas-instruction">双击锁定/解锁画布</div>
@@ -836,7 +1124,13 @@
       <div class="top-bar" id="topBar">
         <div class="toolbar-group">
           <button class="circle-btn" id="fileBtn" title="打开本地PDF">
-            <img src="assets/icon/打开.svg" alt="打开" class="btn-icon" />
+            <img src="assets/icon/open.svg" alt="打开" class="btn-icon" />
+          </button>
+          <button class="circle-btn" id="historyBtn" title="历史记录">
+            <img src="assets/icon/history.svg" alt="历史" class="btn-icon" />
+          </button>
+          <button class="circle-btn" id="controllerBtn" title="手柄连接">
+            <img src="assets/icon/controller.svg" alt="手柄" class="btn-icon" />
           </button>
           <button
             class="circle-btn"
@@ -856,21 +1150,11 @@
               ></path>
             </svg>
           </button>
-          <input
-            type="text"
-            id="scaleInput"
-            class="scale-input"
-            value="100"
-            readonly
-          />
-          <button class="circle-btn" id="historyBtn" title="历史记录">
-            <img src="assets/icon/历史.svg" alt="历史" class="btn-icon" />
-          </button>
           <button class="circle-btn" id="fullscreenBtn" title="全屏">
-            <img src="assets/icon/全屏画布.svg" alt="全屏" class="btn-icon" />
+            <img src="assets/icon/fullscreen.svg" alt="全屏" class="btn-icon" />
           </button>
           <button class="circle-btn" id="resetBtn" title="重置视图">
-            <img src="assets/icon/刷新.svg" alt="重置" class="btn-icon" />
+            <img src="assets/icon/refresh.svg" alt="重置" class="btn-icon" />
           </button>
         </div>
       </div>
@@ -878,19 +1162,26 @@
       <!-- 历史下拉菜单 -->
       <div id="historyMenu" class="history-menu"></div>
 
-      <!-- 左侧锁定按钮（固定） -->
-      <button id="lockBtn" class="fixed-btn" style="bottom: 30px">
-        <img src="assets/icon/开锁.svg" alt="开锁" class="fixed-btn-icon" />
-      </button>
-
-      <!-- 右侧语音按钮（固定） -->
-      <button id="thumbCard" class="fixed-btn" style="bottom: 30px">
-        <img src="assets/icon/语音.svg" alt="语音" class="fixed-btn-icon" />
-      </button>
+      <!-- 底部工具栏 - 三个元素水平中心对齐 -->
+      <div class="bottom-toolbar" id="bottomToolbar">
+        <!-- 左侧锁定按钮 -->
+        <button id="lockBtn" class="fixed-btn">
+          <img src="assets/icon/unlock.svg" alt="开锁" class="fixed-btn-icon" />
+        </button>
+        <!-- 中间比例显示按钮 -->
+        <button id="scaleInput" class="scale-btn">100%</button>
+        <!-- 右侧语音按钮 -->
+        <button id="thumbCard" class="fixed-btn">
+          <img src="assets/icon/voice.svg" alt="语音" class="fixed-btn-icon" />
+        </button>
+      </div>
 
       <div id="loadingMask" class="loading-mask" style="display: none">
-        <img src="assets/icon/刷新.svg" alt="加载中" class="loading-icon" />
-        <span>加载中...</span>
+        <span class="loading-dots">
+          <span class="loading-dot"></span>
+          <span class="loading-dot"></span>
+          <span class="loading-dot"></span>
+        </span>
       </div>
 
       <!-- 视口导航窗口 -->
@@ -907,9 +1198,85 @@
         accept="application/pdf"
         style="display: none"
       />
+
+      <!-- 控制区域容器 -->
+      <div
+        style="
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: transparent;
+          padding: 0;
+          border: none;
+          border-radius: 0;
+          box-shadow: none;
+          z-index: 160;
+          display: flex;
+          gap: 2vh;
+          align-items: center;
+          justify-content: center;
+          height: calc(100vh / 7);
+          width: calc(6 * 12.5vh + 5 * 2vh);
+          min-width: calc(6 * 44px + 5 * 8px);
+          max-width: 90%;
+          box-sizing: border-box;
+          animation: fadeIn 0.3s ease-out forwards;
+          opacity: 0;
+        "
+      >
+        <!-- 左侧图片区域 -->
+        <div
+          id="imageOuterContainer"
+          style="
+            position: relative;
+            flex-shrink: 0;
+            width: auto;
+            height: 100%;
+            aspect-ratio: 1;
+            background: #fff;
+            padding: 4px;
+            margin: 0;
+            border-radius: 1.6px;
+            overflow: hidden;
+            box-sizing: border-box;
+          "
+        >
+          <img
+            src="assets/icon/easypdfmain.jpg"
+            alt="EasyPDF"
+            style="width: 100%; height: 100%; object-fit: cover"
+          />
+        </div>
+
+        <!-- 右侧二维码区域 -->
+        <div
+          id="mainQrcodeContainer"
+          style="
+            flex-shrink: 0;
+            width: auto;
+            height: 100%;
+            aspect-ratio: 1;
+            background: #fff;
+            padding: 4px;
+            margin: 0;
+            cursor: pointer;
+            border-radius: 1.6px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+          "
+          onclick="copyControllerUrl()"
+        ></div>
+      </div>
     </div>
 
     <script>
+      console.log("Main script loaded");
+
       // ==================== DOM 元素 ====================
       const canvas = document.getElementById("pdfCanvas");
       const canvasArea = document.getElementById("canvasArea");
@@ -944,6 +1311,9 @@
         offsetY = 0; // 偏移量（物理像素）
       let offscreenCanvas = null; // 离屏渲染画布
       let dpr = window.devicePixelRatio || 1;
+      let fitScale = 1.0; // 全内容显示比例（最小缩放比例）
+      let cachedPhoneWidth = null; // 缓存的手机容器宽度（避免抖动）
+      let cachedPhoneHeight = null; // 缓存的手机容器高度（避免抖动）
 
       let locked = false; // 锁定模式
       let isUsingBestScale = false; // 是否使用最佳比例
@@ -1004,14 +1374,1259 @@
       // 页面加载时初始化
       initBestScaleButton();
 
+      // ==================== 多屏幕管理 ====================
+      let currentWindowId = null; // 当前窗口唯一标识
+      let isMainScreen = true; // 是否为主屏
+      let screenName = "主屏"; // 当前屏幕名称
+      let totalScreens = 1; // 总屏幕数
+
+      // 生成或获取windowId（每个窗口唯一）
+      function generateWindowId() {
+        let windowId = localStorage.getItem("easypdf_window_id");
+        if (windowId) {
+          console.log("从localStorage获取windowId:", windowId);
+          return windowId;
+        }
+        // 生成新的windowId
+        const newWindowId = `win_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem("easypdf_window_id", newWindowId);
+        console.log("生成新windowId:", newWindowId);
+        return newWindowId;
+      }
+
+      // 获取当前windowId
+      function getCurrentWindowId() {
+        if (!currentWindowId) {
+          currentWindowId = generateWindowId();
+        }
+        return currentWindowId;
+      }
+
+      // 更新屏幕状态UI - 直接跳转到对应页面
+      function updateScreenStatusUI(isMain, name, total) {
+        isMainScreen = isMain;
+        screenName = name || (isMain ? "主屏" : "次屏");
+        totalScreens = total || 1;
+
+        // 更新页面标题
+        document.title = `${screenName} - EasyPDF`;
+
+        // 直接跳转到对应页面
+        navigateToScreenPage(isMain);
+      }
+
+      // 显示重复屏幕提醒
+      function showDuplicateScreenAlert(message) {
+        // 创建提醒元素
+        let alertDiv = document.getElementById("duplicateAlert");
+        if (!alertDiv) {
+          alertDiv = document.createElement("div");
+          alertDiv.id = "duplicateAlert";
+          alertDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            z-index: 9999;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            animation: fadeInScale 0.3s ease-out;
+          `;
+          document.body.appendChild(alertDiv);
+        }
+        alertDiv.textContent = message;
+        alertDiv.style.display = "block";
+
+        // 3秒后自动消失
+        setTimeout(() => {
+          if (alertDiv) {
+            alertDiv.style.animation = "fadeOutScale 0.3s ease-out";
+            setTimeout(() => {
+              alertDiv.style.display = "none";
+            }, 300);
+          }
+        }, 3000);
+      }
+
+      // 根据屏幕状态跳转到对应页面
+      function navigateToScreenPage(isMain) {
+        // 获取当前URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get("session") || getCurrentSessionId();
+        const windowId = urlParams.get("window") || getCurrentWindowId();
+        const date =
+          urlParams.get("date") || new Date().toISOString().split("T")[0];
+
+        // 构建目标URL
+        let targetUrl;
+        if (isMain) {
+          targetUrl = `${window.location.protocol}//${window.location.host}/?session=${sessionId}&date=${date}&window=${windowId}`;
+        } else {
+          targetUrl = `${window.location.protocol}//${window.location.host}/split-screen.html?session=${sessionId}&date=${date}&window=${windowId}`;
+        }
+
+        // 如果当前页面已经是目标页面，不需要跳转
+        if (window.location.href.includes(targetUrl)) {
+          return;
+        }
+
+        // 跳转到目标页面
+        console.log(`跳转到${isMain ? "主屏" : "次屏"}页面:`, targetUrl);
+        window.location.href = targetUrl;
+      }
+
+      // 显示主屏UI（完整界面）
+      function showMainScreenUI() {
+        // 显示完整工具栏
+        document.getElementById("topBar").classList.add("show");
+        document.getElementById("bottomToolbar").classList.add("show");
+
+        // 显示手柄连接按钮
+        const controllerBtn = document.getElementById("controllerBtn");
+        if (controllerBtn) {
+          controllerBtn.style.display = "block";
+        }
+      }
+
+      // 显示次屏UI（保持工具栏显示）
+      function showSecondaryScreenUI() {
+        // 次屏保持工具栏显示，仅通过水印区分
+        document.getElementById("topBar").classList.add("show");
+        document.getElementById("bottomToolbar").classList.add("show");
+
+        // 隐藏手柄连接按钮（次屏不允许连接）
+        const controllerBtn = document.getElementById("controllerBtn");
+        if (controllerBtn) {
+          controllerBtn.style.display = "none";
+        }
+      }
+
+      // ==================== WebSocket客户端 ====================
+      let ws = null;
+      let currentSessionId = null;
+
+      // 获取URL参数中的session
+      function getSessionFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("session");
+      }
+
+      // 生成或获取sessionId
+      function generateSessionId() {
+        // 优先从URL参数获取session（用于手机端扫码后同步）
+        const urlSession = getSessionFromUrl();
+        if (urlSession) {
+          console.log("从URL获取session:", urlSession);
+          return urlSession;
+        }
+
+        const today = new Date();
+        const dateStr = today.toISOString().split("T")[0];
+        const storedSession = localStorage.getItem(
+          `easypdf_session_${dateStr}`,
+        );
+
+        if (storedSession) {
+          console.log("从localStorage获取session:", storedSession);
+          return storedSession;
+        }
+
+        // 生成新的sessionId
+        const newSessionId = `${dateStr}-${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem(`easypdf_session_${dateStr}`, newSessionId);
+        console.log("生成新session:", newSessionId);
+        return newSessionId;
+      }
+
+      // 初始化WebSocket连接
+      function initWebSocket() {
+        // 如果已连接，先关闭
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+
+        currentSessionId = generateSessionId();
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}/ws?session=${currentSessionId}&type=main&window=${getCurrentWindowId()}`;
+
+        console.log("=== 尝试连接WebSocket ===");
+        console.log("Session ID:", currentSessionId);
+        console.log("WebSocket URL:", wsUrl);
+        console.log("当前页面URL:", window.location.href);
+
+        // 检查是否通过服务器访问
+        if (window.location.protocol === "file:") {
+          console.error("错误：请通过服务器访问页面，而不是直接打开文件！");
+          alert(
+            "请通过服务器访问页面（http://localhost:8000），而不是直接打开文件！",
+          );
+          return;
+        }
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function () {
+          console.log("✅ WebSocket连接已建立");
+          console.log("Session ID:", currentSessionId);
+          updateControllerStatus(false); // 初始状态为未连接
+          // 请求当前登录状态
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "getLoginStatus" }));
+            console.log("📤 请求登录状态");
+          }
+        };
+
+        ws.onmessage = function (event) {
+          try {
+            const data = JSON.parse(event.data);
+            console.log("收到消息:", data.type);
+
+            // 优先处理登录状态消息
+            if (data.type === "loginStatus") {
+              console.log("[登录同步] 主页面收到登录状态:", data.isLoggedIn);
+              if (data.isLoggedIn) {
+                isLoggedIn = true;
+                hideLoginOverlay();
+                localStorage.setItem("easyPdfAuth", "true");
+                console.log("[登录同步] ✅ 主页面登录状态已更新为已登录");
+              }
+            }
+
+            handleControllerCommand(data);
+          } catch (error) {
+            console.error("解析消息失败:", error);
+          }
+        };
+
+        ws.onclose = function (event) {
+          console.log("❌ WebSocket连接已关闭", event.code, event.reason);
+          // 自动重连
+          setTimeout(initWebSocket, 3000);
+        };
+
+        ws.onerror = function (error) {
+          console.error("❌ WebSocket错误:", error);
+        };
+      }
+
+      // 处理手柄命令
+      function handleControllerCommand(command) {
+        switch (command.type) {
+          case "controllerConnected":
+            console.log("手柄已连接:", command.message);
+            updateControllerStatus(true);
+            break;
+          case "loginStatus":
+            // 手机端登录成功，同步登录状态到主页端
+            console.log("收到手机端登录状态:", command.isLoggedIn);
+            if (command.isLoggedIn) {
+              isLoggedIn = true;
+              hideLoginOverlay();
+              // 更新本地缓存
+              localStorage.setItem("easyPdfAuth", "true");
+              console.log("✅ 主页登录状态已更新");
+            }
+            break;
+          case "zoom":
+            // 以电脑视口中心为基准进行缩放，保持视口中心内容不变
+            let newScale = command.scale;
+            // 限制最小缩放比例为全内容显示比例
+            if (newScale < fitScale) {
+              newScale = fitScale;
+            }
+            if (currentPage && scale !== newScale && newScale > 0) {
+              // 获取canvas尺寸（逻辑像素）
+              const canvasWidth = window.innerWidth;
+              const canvasHeight = window.innerHeight;
+
+              // 计算缩放前视口中心在PDF上的位置（PDF页面坐标）
+              const oldCenterX = (-offsetX / dpr + canvasWidth / 2) / scale;
+              const oldCenterY = (-offsetY / dpr + canvasHeight / 2) / scale;
+
+              // 设置新的缩放比例
+              scale = newScale;
+
+              // 计算新的偏移量，使视口中心保持在原来的位置
+              const newCenterScreenX = oldCenterX * scale;
+              const newCenterScreenY = oldCenterY * scale;
+              offsetX = (canvasWidth / 2 - newCenterScreenX) * dpr;
+              offsetY = (canvasHeight / 2 - newCenterScreenY) * dpr;
+            }
+            updatePan();
+            break;
+          case "refresh":
+            // 仅重新渲染PDF，不改变其他状态（用于手柄端缩放后刷新）
+            refreshRender();
+            break;
+          case "pan":
+            // 手机端发送的是逻辑像素，转换为物理像素
+            console.log("💻 电脑端收到pan命令:", command);
+            offsetX = command.offsetX * dpr;
+            offsetY = command.offsetY * dpr;
+            console.log("💻 电脑端更新偏移量:", offsetX, offsetY);
+            updatePan();
+            break;
+          case "openFile":
+            document.getElementById("fileInput").click();
+            break;
+          case "openFileFromSupabase":
+            // 从Supabase下载并打开文件（手机端上传后通知）
+            console.log("💻 收到手机端文件信息:", command);
+            loadFromSupabase(command.storagePath, command.fileName);
+            break;
+          case "history":
+            document.getElementById("historyBtn").click();
+            break;
+          case "loadHistoryFile":
+            // 从手柄加载历史文件
+            loadFromSupabase(command.storagePath, command.fileName);
+            break;
+          case "loadFile":
+            // 从手柄加载新上传的文件
+            loadFromSupabase(command.storagePath, command.fileName);
+            break;
+          case "toggleView":
+            // 直接模拟点击重置视图按钮，复用现有逻辑
+            document.getElementById("resetBtn").click();
+            break;
+          case "bestView":
+            setBestScale();
+            break;
+          case "resetBestScale":
+            resetBestScale();
+            break;
+          case "saveBestScale":
+            // 模拟双击最佳比例按钮，复用现有逻辑
+            document
+              .getElementById("bestScaleBtn")
+              .dispatchEvent(new Event("dblclick"));
+            break;
+          case "fullscreen":
+            toggleFullscreen();
+            break;
+          case "toggleGrid":
+            toggleCoordinateSystem();
+            break;
+          case "voice":
+            if (command.action === "start") {
+              startVoiceRecognition();
+            } else if (command.action === "end") {
+              stopVoiceRecognition();
+            }
+            break;
+          case "getState":
+            // 回复当前状态
+            let pageWidth = 0,
+              pageHeight = 0;
+            if (currentPage) {
+              const viewport = currentPage.getViewport({ scale: 1 });
+              pageWidth = viewport.width;
+              pageHeight = viewport.height;
+            }
+            // 获取电脑端视口尺寸 - 使用window.innerWidth/innerHeight确保获取真实屏幕尺寸
+            // 不要使用canvasArea.getBoundingClientRect()，因为它可能被工具栏等元素遮挡导致尺寸不准确
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            sendToController({
+              type: "state",
+              hasFile: !!currentPage,
+              scale: currentPage ? scale : 1,
+              offsetX: currentPage ? offsetX : 0,
+              offsetY: currentPage ? offsetY : 0,
+              fileUrl: currentFileUrl || null,
+              pageWidth: pageWidth,
+              pageHeight: pageHeight,
+              // 视口比例（用于手机端设置容器大小）
+              viewportWidth: viewportWidth,
+              viewportHeight: viewportHeight,
+            });
+            break;
+          case "screenInfo":
+            // 手机端发送屏幕尺寸信息，根据尺寸渲染并发送图片
+            console.log(
+              "收到screenInfo - currentPage:",
+              !!currentPage,
+              "width:",
+              command.width,
+              "height:",
+              command.height,
+            );
+
+            // 检查条件
+            const hasCurrentPage = !!currentPage;
+            const hasWidth = command.width && command.width > 0;
+            const hasHeight = command.height && command.height > 0;
+
+            if (hasCurrentPage && hasWidth && hasHeight) {
+              // 缓存第一次收到的手机容器尺寸，避免抖动
+              if (!cachedPhoneWidth || !cachedPhoneHeight) {
+                cachedPhoneWidth = command.width;
+                cachedPhoneHeight = command.height;
+                console.log(
+                  "缓存手机容器尺寸:",
+                  cachedPhoneWidth,
+                  "x",
+                  cachedPhoneHeight,
+                );
+              }
+              console.log(
+                "调用renderAndSendPDFImage - 尺寸:",
+                cachedPhoneWidth || command.width,
+                "x",
+                cachedPhoneHeight || command.height,
+              );
+              renderAndSendPDFImage(
+                cachedPhoneWidth || command.width,
+                cachedPhoneHeight || command.height,
+                command.orientation,
+              );
+            } else {
+              console.warn(
+                "screenInfo条件不满足:",
+                "hasCurrentPage:",
+                hasCurrentPage,
+                "hasWidth:",
+                hasWidth,
+                "(value:",
+                command.width,
+                ")",
+                "hasHeight:",
+                hasHeight,
+                "(value:",
+                command.height,
+                ")",
+              );
+
+              // 如果只是尺寸为0，延迟重试
+              if (hasCurrentPage && (!hasWidth || !hasHeight)) {
+                console.log("尺寸无效，等待100ms后重试获取状态");
+                setTimeout(() => {
+                  // 请求状态更新
+                  sendCommand({ type: "getState" });
+                }, 100);
+              }
+            }
+            break;
+          case "screenStatus":
+            // 手机端发送屏幕状态更新
+            console.log("收到屏幕状态:", command);
+            if (command.screens && Array.isArray(command.screens)) {
+              const myWindowId = getCurrentWindowId();
+              const myScreen = command.screens.find(
+                (s) => s.windowId === myWindowId,
+              );
+              if (myScreen) {
+                updateScreenStatusUI(
+                  myScreen.isMain,
+                  myScreen.name,
+                  command.totalScreens,
+                );
+                // 根据状态切换页面
+                navigateToScreenPage(myScreen.isMain);
+              }
+            } else {
+              // 兼容旧消息格式
+              updateScreenStatusUI(
+                command.isMain,
+                command.screenName,
+                command.totalScreens,
+              );
+              navigateToScreenPage(command.isMain);
+            }
+            break;
+          case "duplicateScreen":
+            // 收到重复屏幕提醒 - 只有匹配当前窗口才显示
+            if (command.windowId === getCurrentWindowId()) {
+              showDuplicateScreenAlert(command.message);
+            }
+            break;
+          case "setMainScreen":
+            // 设置为主屏
+            console.log("设置为主屏:", command);
+            if (command.screens && Array.isArray(command.screens)) {
+              const myWindowId = getCurrentWindowId();
+              const myScreen = command.screens.find(
+                (s) => s.windowId === myWindowId,
+              );
+              if (myScreen) {
+                updateScreenStatusUI(
+                  myScreen.isMain,
+                  myScreen.name,
+                  command.totalScreens || totalScreens,
+                );
+              }
+            } else {
+              // 兼容旧消息格式
+              updateScreenStatusUI(
+                true,
+                "主屏",
+                command.totalScreens || totalScreens,
+              );
+            }
+            break;
+          case "switchScreen":
+            // 切换屏幕状态
+            console.log("切换屏幕:", command);
+            if (command.screens && Array.isArray(command.screens)) {
+              const myWindowId = getCurrentWindowId();
+              const myScreen = command.screens.find(
+                (s) => s.windowId === myWindowId,
+              );
+              if (myScreen) {
+                updateScreenStatusUI(
+                  myScreen.isMain,
+                  myScreen.name,
+                  command.totalScreens,
+                );
+              }
+            } else {
+              // 兼容旧消息格式
+              updateScreenStatusUI(
+                command.isMain,
+                command.screenName,
+                command.totalScreens,
+              );
+            }
+            break;
+          default:
+            console.log("未知命令:", command.type);
+        }
+      }
+
+      // 获取当前sessionId（用于生成二维码）
+      function getCurrentSessionId() {
+        if (!currentSessionId) {
+          currentSessionId = generateSessionId();
+        }
+        return currentSessionId;
+      }
+
+      // 获取手柄页面URL（包含sessionId和windowId）
+      function getControllerUrl() {
+        const sessionId = getCurrentSessionId();
+        const windowId = getCurrentWindowId();
+        const today = new Date();
+        const dateStr = today.toISOString().split("T")[0];
+        return `${window.location.protocol}//${window.location.host}/controller?session=${sessionId}&date=${dateStr}&window=${windowId}`;
+      }
+
+      // 显示手柄连接弹窗
+      function showControllerModal() {
+        console.log("showControllerModal called");
+        const overlay = document.getElementById("controllerOverlay");
+        if (overlay) {
+          overlay.classList.add("show");
+        }
+      }
+
+      // 隐藏手柄连接弹窗
+      function hideControllerModal() {
+        const overlay = document.getElementById("controllerOverlay");
+        if (overlay) {
+          overlay.classList.remove("show");
+        }
+      }
+
+      // 手柄按钮点击处理
+      function handleControllerBtnClick() {
+        console.log("=== 手柄按钮点击事件 ===");
+        console.log("当前时间:", new Date().toLocaleTimeString());
+        console.log("isLoggedIn:", isLoggedIn);
+
+        // 未登录时显示登录框
+        if (!isLoggedIn) {
+          console.log("用户未登录，显示登录框");
+          showLoginOverlay();
+          return;
+        }
+
+        // 已登录时显示连接模式对话框
+        console.log("用户已登录，准备显示连接模式对话框");
+        const controllerModal = document.getElementById("controllerModal");
+        console.log("controllerModal元素:", controllerModal);
+        if (controllerModal) {
+          console.log(
+            "controllerModal当前display:",
+            controllerModal.style.display,
+          );
+        } else {
+          console.error("controllerModal元素不存在！");
+        }
+
+        showControllerModal();
+
+        // 检查显示后状态
+        setTimeout(() => {
+          if (controllerModal) {
+            console.log(
+              "显示后controllerModal的display:",
+              controllerModal.style.display,
+            );
+          }
+        }, 100);
+      }
+
+      // 弹窗点击处理
+      function handleModalClick(e) {
+        if (e.target === e.currentTarget) {
+          hideControllerModal();
+        }
+      }
+
+      // 手柄按钮初始化函数（可在登录后重新调用）
+      function initControllerButton() {
+        const controllerBtn = document.getElementById("controllerBtn");
+        const closeControllerOverlay = document.getElementById(
+          "closeControllerOverlay",
+        );
+        const controllerOverlay = document.getElementById("controllerOverlay");
+
+        console.log("=== initControllerButton 被调用 ===");
+        console.log("当前时间:", new Date().toLocaleTimeString());
+        console.log("controllerBtn元素:", controllerBtn);
+        console.log("closeControllerOverlay元素:", closeControllerOverlay);
+        console.log("controllerOverlay元素:", controllerOverlay);
+
+        if (controllerBtn) {
+          // 先移除可能存在的事件监听器
+          controllerBtn.removeEventListener("click", handleControllerBtnClick);
+          controllerBtn.addEventListener("click", handleControllerBtnClick);
+        }
+
+        if (closeControllerOverlay) {
+          closeControllerOverlay.removeEventListener(
+            "click",
+            hideControllerModal,
+          );
+          closeControllerOverlay.addEventListener("click", hideControllerModal);
+        }
+
+        // 连接模式选项点击事件
+        document
+          .getElementById("hostOption")
+          ?.addEventListener("click", function () {
+            console.log("选择主机模式");
+            alert("主机模式已选择");
+            hideControllerModal();
+          });
+
+        document
+          .getElementById("remoteOption")
+          ?.addEventListener("click", function () {
+            console.log("选择遥控模式");
+            alert("遥控模式已选择");
+            hideControllerModal();
+          });
+
+        document
+          .getElementById("split1Option")
+          ?.addEventListener("click", function () {
+            console.log("选择分屏1");
+            alert("分屏1已选择");
+            hideControllerModal();
+          });
+
+        document
+          .getElementById("split2Option")
+          ?.addEventListener("click", function () {
+            console.log("选择分屏2");
+            alert("分屏2已选择");
+            hideControllerModal();
+          });
+
+        document
+          .getElementById("split3Option")
+          ?.addEventListener("click", function () {
+            console.log("选择分屏3");
+            alert("分屏3已选择");
+            hideControllerModal();
+          });
+
+        // 点击弹窗外部关闭弹窗
+        if (controllerOverlay) {
+          controllerOverlay.removeEventListener("click", handleModalClick);
+          controllerOverlay.addEventListener("click", handleModalClick);
+        }
+      }
+
+      // 复制手柄URL（支持弹窗和二维码点击）
+      function copyControllerUrl() {
+        const url = getControllerUrl();
+
+        navigator.clipboard
+          .writeText(url)
+          .then(() => {
+            // 二维码底色灰色闪烁效果
+            flashQrcodeContainer();
+
+            // 同时更新弹窗中的复制按钮状态
+            const copyBtn = document.getElementById("copyUrlBtn");
+            if (copyBtn) {
+              const originalText = copyBtn.textContent;
+              copyBtn.textContent = "已复制!";
+              setTimeout(() => {
+                copyBtn.textContent = originalText;
+              }, 2000);
+            }
+          })
+          .catch((err) => {
+            console.error("复制失败:", err);
+            // 降级方案
+            const textArea = document.createElement("textarea");
+            textArea.value = url;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+
+            // 二维码底色灰色闪烁效果
+            flashQrcodeContainer();
+          });
+      }
+
+      // 二维码容器灰色闪烁效果
+      function flashQrcodeContainer() {
+        const qrcodeContainer = document.getElementById("mainQrcodeContainer");
+        if (qrcodeContainer) {
+          // 保存原始背景色
+          const originalBg = qrcodeContainer.style.backgroundColor;
+          // 设置灰色背景
+          qrcodeContainer.style.backgroundColor = "#999999";
+          // 300ms后恢复原色
+          setTimeout(() => {
+            qrcodeContainer.style.backgroundColor = originalBg || "#ffffff";
+          }, 300);
+        }
+      }
+
+      // 生成QR Code（使用标准qrcode.js库）
+      function generateQRCode(text) {
+        console.log("生成二维码:", text);
+
+        const container = document.getElementById("mainQrcodeContainer");
+        if (!container) {
+          console.error("未找到mainQrcodeContainer元素");
+          return;
+        }
+
+        if (!window.QRCode) {
+          console.error("QRCode库未加载");
+          container.innerHTML =
+            "<div style='color:#000; text-align:center;'>加载中...</div>";
+          setTimeout(() => generateQRCode(text), 300);
+          return;
+        }
+
+        // 直接根据视口高度计算二维码尺寸（容器高度 = 100vh/7，aspect-ratio: 1）
+        const padding = 8; // 左右/上下各4px，总共8px
+        const containerSize = Math.max(40, window.innerHeight / 7 - padding);
+        const qrSize = Math.floor(containerSize);
+
+        console.log("二维码渲染尺寸:", qrSize);
+
+        // 检查本地缓存（只按内容缓存，不按尺寸，实现响应式复用）
+        const cacheKey = `qrcode_${text}`;
+        const cachedData = localStorage.getItem(cacheKey);
+
+        // 创建canvas元素，尺寸与图片容器一致
+        const canvas = document.createElement("canvas");
+        canvas.id = "qrcodeCanvas";
+        canvas.width = qrSize;
+        canvas.height = qrSize;
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.imageRendering = "crisp-edges";
+
+        // 清空容器并添加canvas
+        container.innerHTML = "";
+        container.appendChild(canvas);
+
+        if (cachedData) {
+          // 使用缓存的二维码
+          console.log("使用缓存的二维码");
+          const img = new Image();
+          img.onload = function () {
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, qrSize, qrSize);
+          };
+          img.src = cachedData;
+          return;
+        }
+
+        // 生成二维码
+        QRCode.toCanvas(
+          canvas,
+          text,
+          {
+            width: qrSize,
+            margin: 0,
+            color: {
+              dark: "#000000",
+              light: "#ffffff",
+            },
+          },
+          (error) => {
+            if (error) {
+              console.error("二维码生成失败:", error);
+              container.innerHTML =
+                "<div style='color:#000; text-align:center; padding:20px;'>生成失败</div>";
+            } else {
+              console.log("二维码生成成功，大小:", qrSize);
+              // 将生成的二维码缓存到localStorage
+              const dataUrl = canvas.toDataURL("image/png");
+              localStorage.setItem(cacheKey, dataUrl);
+              console.log("二维码已缓存");
+            }
+          },
+        );
+      }
+
+      // 页面加载时生成二维码
+      function initQRCode() {
+        // 确保sessionId已初始化
+        if (!currentSessionId) {
+          currentSessionId = generateSessionId();
+        }
+        const url = getControllerUrl();
+        generateQRCode(url);
+      }
+
+      // 更新手柄连接状态
+      function updateControllerStatus(connected) {
+        const statusText = document.getElementById("controllerStatus");
+        if (connected) {
+          statusText.textContent = "手柄已连接";
+          statusText.classList.add("connected");
+        } else {
+          statusText.textContent = "等待手柄连接...";
+          statusText.classList.remove("connected");
+        }
+      }
+
+      // 发送消息到手柄（自动添加windowId）
+      function sendToController(message) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          // 自动添加windowId到消息中
+          const messageWithWindowId = {
+            ...message,
+            windowId: getCurrentWindowId(),
+          };
+          ws.send(JSON.stringify(messageWithWindowId));
+          console.log("发送消息到手柄:", message.type);
+        } else {
+          console.warn("WebSocket未连接，无法发送消息:", message.type);
+        }
+      }
+
+      // 记录上次发送图片的方向
+      let lastSentOrientation = null;
+
+      // 发送PDF图片数据的辅助函数
+      function sendPdfImageData(
+        imageData,
+        pageWidth,
+        pageHeight,
+        phoneWidth,
+        phoneHeight,
+        orientation,
+        viewportLeft,
+        viewportTop,
+        viewportWidth,
+        viewportHeight,
+      ) {
+        if (!imageData || imageData.length < 100) {
+          console.error("无效的图片数据");
+          return;
+        }
+
+        console.log("发送PDF图片，数据大小:", imageData.length, "字节");
+
+        // 检查数据大小，如果太大则降低质量
+        let finalImageData = imageData;
+        let quality = 0.9;
+
+        if (imageData.length > 2000000) {
+          console.warn(
+            "图片数据过大(" + imageData.length + "字节)，尝试降低质量",
+          );
+          quality = 0.7;
+          // 注意：这里无法重新生成，因为没有canvas引用，直接发送原始数据
+        }
+
+        sendToController({
+          type: "pdfImage",
+          imageData: finalImageData,
+          pageWidth: pageWidth,
+          pageHeight: pageHeight,
+          phoneWidth: phoneWidth,
+          phoneHeight: phoneHeight,
+          orientation: orientation,
+          viewportLeft: viewportLeft,
+          viewportTop: viewportTop,
+          viewportWidth: viewportWidth,
+          viewportHeight: viewportHeight,
+          scale: scale,
+          offsetX: offsetX / (window.devicePixelRatio || 1),
+          offsetY: offsetY / (window.devicePixelRatio || 1),
+        });
+      }
+
+      // 直接渲染PDF页面内容并发送给手机端（不根据手机屏幕尺寸适配）
+      async function renderAndSendPDFImage(
+        phoneWidth,
+        phoneHeight,
+        orientation,
+      ) {
+        if (!currentPage) return;
+
+        console.log("渲染PDF页面发送给手机端", "方向:", orientation);
+
+        // 获取当前视口信息（用于发送给手机端）
+        const viewport = currentPage.getViewport({ scale: 1 });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+
+        console.log("PDF页面尺寸:", pageWidth, "x", pageHeight);
+
+        // 获取设备像素比
+        const dpr = window.devicePixelRatio || 1;
+
+        // 计算视口在PDF页面上的位置和大小（使用当前缩放比例）
+        const canvasWidth = window.innerWidth;
+        const canvasHeight = window.innerHeight;
+        const viewportLeft = -offsetX / dpr / scale;
+        const viewportTop = -offsetY / dpr / scale;
+        const viewportWidth = canvasWidth / scale;
+        const viewportHeight = canvasHeight / scale;
+
+        // 创建离屏canvas（使用自适应缩放比例，避免超大canvas）
+        const renderCanvas = document.createElement("canvas");
+        const renderCtx = renderCanvas.getContext("2d");
+
+        if (!renderCtx) {
+          console.error("无法创建canvas上下文");
+          return;
+        }
+
+        // 计算最大canvas尺寸（避免内存不足）
+        const maxCanvasSize = 4096; // 最大尺寸限制
+        let renderScale = 1.0;
+
+        // 根据页面尺寸计算合适的缩放比例
+        const maxDimension = Math.max(pageWidth, pageHeight);
+        if (maxDimension > maxCanvasSize) {
+          renderScale = maxCanvasSize / maxDimension;
+          console.log("页面尺寸过大，降低渲染比例:", renderScale);
+        } else if (phoneWidth && phoneHeight) {
+          // 如果有手机尺寸信息，使用合适的缩放比例
+          const scaleByWidth = phoneWidth / pageWidth;
+          const scaleByHeight = phoneHeight / pageHeight;
+          renderScale = Math.min(scaleByWidth, scaleByHeight, 2.0);
+        }
+
+        // 设置canvas尺寸
+        const canvasW = pageWidth * renderScale;
+        const canvasH = pageHeight * renderScale;
+
+        console.log(
+          "渲染尺寸:",
+          canvasW,
+          "x",
+          canvasH,
+          "缩放比例:",
+          renderScale,
+        );
+
+        // 检查canvas尺寸是否在合理范围内
+        if (canvasW > 8192 || canvasH > 8192) {
+          console.error("canvas尺寸过大:", canvasW, "x", canvasH);
+          return;
+        }
+
+        renderCanvas.width = canvasW * dpr;
+        renderCanvas.height = canvasH * dpr;
+        renderCtx.scale(dpr, dpr);
+
+        // 清空画布（与手机端容器底色一致的背景色 #f5f5f5）
+        renderCtx.fillStyle = "#f5f5f5";
+        renderCtx.fillRect(0, 0, canvasW, canvasH);
+
+        // 创建PDF视口（使用渲染比例）
+        const renderViewport = currentPage.getViewport({
+          scale: renderScale,
+        });
+
+        const renderContext = {
+          canvasContext: renderCtx,
+          viewport: renderViewport,
+          enableWebGL: true,
+          background: "#f5f5f5", // 设置与手机端容器一致的背景色
+        };
+
+        try {
+          // 渲染整个PDF页面
+          await currentPage.render(renderContext).promise;
+        } catch (renderError) {
+          console.error("PDF渲染失败:", renderError);
+          // 尝试禁用WebGL重新渲染
+          console.log("尝试禁用WebGL重新渲染");
+          const renderContextNoWebGL = {
+            canvasContext: renderCtx,
+            viewport: renderViewport,
+            enableWebGL: false,
+            background: "#f5f5f5", // 设置与手机端容器一致的背景色
+          };
+          try {
+            await currentPage.render(renderContextNoWebGL).promise;
+          } catch (error2) {
+            console.error("禁用WebGL后渲染仍然失败:", error2);
+            return;
+          }
+        }
+
+        // 在PDF渲染完成后，使用destination-over模式填充背景色
+        // 确保所有透明区域都被填充为#f5f5f5，与手机端容器底色一致
+        renderCtx.globalCompositeOperation = "destination-over";
+        renderCtx.fillStyle = "#f5f5f5";
+        renderCtx.fillRect(0, 0, canvasW, canvasH);
+        renderCtx.globalCompositeOperation = "source-over";
+
+        // 转换为图片数据发送（优先使用WebP格式，压缩率高）
+        // 先尝试WebP格式（质量0.85），不支持则降级到JPEG
+        let imageData = renderCanvas.toDataURL("image/webp", 0.85);
+
+        // 检查WebP是否生成成功（某些旧浏览器不支持WebP）
+        if (!imageData || imageData.length < 100 || imageData === "data:,") {
+          console.log("WebP格式不支持，降级到JPEG格式");
+          // 在转换为JPEG前，确保背景色正确填充
+          renderCtx.globalCompositeOperation = "destination-over";
+          renderCtx.fillStyle = "#f5f5f5";
+          renderCtx.fillRect(0, 0, canvasW, canvasH);
+          renderCtx.globalCompositeOperation = "source-over";
+
+          imageData = renderCanvas.toDataURL("image/jpeg", 0.85);
+        }
+
+        // 检查图片数据是否有效
+        if (!imageData || imageData.length < 100 || imageData === "data:,") {
+          console.error("图片数据无效");
+          return;
+        }
+
+        console.log(
+          "发送PDF页面图片给手机端，数据大小:",
+          imageData.length,
+          "字节",
+          "页面尺寸:",
+          pageWidth,
+          "x",
+          pageHeight,
+        );
+
+        // 检查数据大小，如果太大则降低质量
+        // 使用较低的阈值（2MB）确保稳定传输
+        let finalImageData = imageData;
+        let quality = 0.85;
+
+        if (imageData.length > 2000000) {
+          // 超过2MB，降低质量
+          console.warn(
+            "图片数据过大(" + imageData.length + "字节)，尝试降低质量",
+          );
+          quality = 0.7;
+          // 在转换前，确保背景色正确填充
+          renderCtx.globalCompositeOperation = "destination-over";
+          renderCtx.fillStyle = "#f5f5f5";
+          renderCtx.fillRect(0, 0, canvasW, canvasH);
+          renderCtx.globalCompositeOperation = "source-over";
+
+          finalImageData =
+            renderCanvas.toDataURL("image/webp", quality) ||
+            renderCanvas.toDataURL("image/jpeg", quality);
+          console.log("降低质量后数据大小:", finalImageData.length, "字节");
+        }
+
+        if (finalImageData.length > 4000000) {
+          // 仍然超过4MB，再次降低质量
+          console.warn(
+            "图片仍然过大(" + finalImageData.length + "字节)，继续降低质量",
+          );
+          quality = 0.5;
+          // 在转换前，确保背景色正确填充
+          renderCtx.globalCompositeOperation = "destination-over";
+          renderCtx.fillStyle = "#f5f5f5";
+          renderCtx.fillRect(0, 0, canvasW, canvasH);
+          renderCtx.globalCompositeOperation = "source-over";
+
+          finalImageData =
+            renderCanvas.toDataURL("image/webp", quality) ||
+            renderCanvas.toDataURL("image/jpeg", quality);
+          console.log("再次降低质量后数据大小:", finalImageData.length, "字节");
+        }
+
+        // 使用辅助函数发送图片数据
+        sendPdfImageData(
+          finalImageData,
+          pageWidth,
+          pageHeight,
+          phoneWidth,
+          phoneHeight,
+          orientation,
+          viewportLeft,
+          viewportTop,
+          viewportWidth,
+          viewportHeight,
+        );
+      }
+
+      // 切换最佳视图
+      function toggleBestView() {
+        if (!currentPage) return;
+
+        if (isUsingBestScale) {
+          // 如果当前是最佳比例，切换回全屏显示
+          const rect = canvasArea.getBoundingClientRect();
+          let canvasW = rect.width;
+          let canvasH = rect.height;
+          if (canvasW < 10) canvasW = window.innerWidth;
+          if (canvasH < 10) canvasH = window.innerHeight;
+          canvasW = canvasW * dpr;
+          canvasH = canvasH * dpr;
+          const viewport = currentPage.getViewport({ scale: 1 });
+          const imgW = viewport.width * dpr;
+          const imgH = viewport.height * dpr;
+          const fullScreenScale = Math.min(canvasW / imgW, canvasH / imgH);
+
+          scale = fullScreenScale;
+          updatePan();
+          isUsingBestScale = false;
+          checkBestScaleStatus();
+        } else {
+          // 如果当前不是最佳比例，切换到最佳比例
+          setBestScale();
+        }
+      }
+
+      // 重置最佳比例
+      async function resetBestScale() {
+        if (!currentPage) return;
+
+        // 计算全屏显示比例
+        const rect = canvasArea.getBoundingClientRect();
+        let canvasW = rect.width;
+        let canvasH = rect.height;
+        if (canvasW < 10) canvasW = window.innerWidth;
+        if (canvasH < 10) canvasH = window.innerHeight;
+        canvasW = canvasW * dpr;
+        canvasH = canvasH * dpr;
+        const viewport = currentPage.getViewport({ scale: 1 });
+        const imgW = viewport.width * dpr;
+        const imgH = viewport.height * dpr;
+        const fullScreenScale = Math.min(canvasW / imgW, canvasH / imgH);
+
+        // 重置最佳比例为全屏显示比例
+        localStorage.setItem(
+          `easyPdfBestScale_${currentFileName}`,
+          fullScreenScale.toString(),
+        );
+        // 清除用户保存标记
+        localStorage.setItem(
+          `easyPdfUserSavedBestScale_${currentFileName}`,
+          "false",
+        );
+
+        // 更新最佳比例的暂存渲染结果
+        const bestScaleViewport = currentPage.getViewport({
+          scale: fullScreenScale * dpr,
+        });
+        const tempOffscreenCanvas = document.createElement("canvas");
+        tempOffscreenCanvas.width = bestScaleViewport.width;
+        tempOffscreenCanvas.height = bestScaleViewport.height;
+        const tempOffCtx = tempOffscreenCanvas.getContext("2d");
+        await currentPage.render({
+          canvasContext: tempOffCtx,
+          viewport: bestScaleViewport,
+          background: isCadPDF ? "transparent" : "white",
+        }).promise;
+        // 更新最佳比例的暂存渲染结果
+        bestScaleRender = document.createElement("canvas");
+        bestScaleRender.width = tempOffscreenCanvas.width;
+        bestScaleRender.height = tempOffscreenCanvas.height;
+        const bestCtx = bestScaleRender.getContext("2d");
+        bestCtx.drawImage(tempOffscreenCanvas, 0, 0);
+
+        // 更新图标为黑色空心
+        const icon = document.getElementById("bestScaleIcon");
+        if (icon) {
+          icon.style.stroke = "#333333";
+          icon.style.fill = "none";
+        }
+
+        showToast("已重置最佳比例");
+        console.log(`已重置最佳比例为全屏显示比例: ${fullScreenScale}`);
+      }
+
+      // 设置最佳比例
+      function setBestScale() {
+        if (!currentPage) return;
+
+        // 从本地存储获取最佳比例
+        const savedBestScale = localStorage.getItem(
+          `easyPdfBestScale_${currentFileName}`,
+        );
+        if (savedBestScale) {
+          scale = parseFloat(savedBestScale);
+          updatePan();
+          isUsingBestScale = true;
+          checkBestScaleStatus();
+        }
+      }
+
+      // 页面加载完成后初始化WebSocket和二维码
+      document.addEventListener("DOMContentLoaded", function () {
+        setTimeout(initWebSocket, 500);
+        initQRCode();
+      });
+
       // ==================== 辅助函数 ====================
-      function showLoading(show, msg = "加载中...") {
+
+      // 计算全内容显示比例（使整个PDF页面刚好适应屏幕）
+      function calculateFitScale() {
+        if (!currentPage) return 1.0;
+
+        const viewport = currentPage.getViewport({ scale: 1 });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+
+        // 获取屏幕尺寸（逻辑像素）
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        // 计算适应宽度和高度的缩放比例，取较小值
+        const scaleX = screenWidth / pageWidth;
+        const scaleY = screenHeight / pageHeight;
+
+        return Math.min(scaleX, scaleY);
+      }
+
+      function showLoading(show, msg = "") {
         if (show) {
-          loadingMask.textContent = msg;
           loadingMask.style.display = "flex";
         } else {
           loadingMask.style.display = "none";
         }
+        // 同步loading状态到手机端
+        sendToController({
+          type: "loading",
+          show: show,
+          message: msg,
+        });
       }
 
       // 登录相关函数
@@ -1038,10 +2653,18 @@
 
         loginError.textContent = "";
 
-        // 修改按钮文本为"Please wait..."
+        // 修改按钮文本为"Please wait..."并添加动画
+        let waitingAnimation = null;
         if (loginButton) {
-          loginButton.textContent = "Please wait...";
+          loginButton.textContent = "Please wait.";
           loginButton.disabled = true;
+
+          // 添加等待动画：. -> .. -> ... -> .... -> ..... -> ...... -> 循环
+          let dots = 1;
+          waitingAnimation = setInterval(() => {
+            dots = (dots % 6) + 1;
+            loginButton.textContent = "Please wait" + ".".repeat(dots);
+          }, 300);
         }
 
         try {
@@ -1058,16 +2681,33 @@
           isLoggedIn = true;
           hideLoginOverlay();
 
+          // 发送登录状态到服务器，广播到所有连接的客户端
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "loginStatus",
+                isLoggedIn: true,
+              }),
+            );
+          }
+
           // 预加载历史记录
           fetchHistoryList().then((items) => {
             cachedHistoryList = items;
           });
+
+          // 登录成功后重新初始化手柄按钮事件
+          initControllerButton();
 
           return true;
         } catch (err) {
           loginError.textContent = "登录失败：" + err.message;
           return false;
         } finally {
+          // 停止等待动画
+          if (waitingAnimation) {
+            clearInterval(waitingAnimation);
+          }
           // 恢复按钮文本
           if (loginButton) {
             loginButton.textContent = originalButtonText;
@@ -1078,7 +2718,7 @@
 
       // 从Supabase加载最佳比例
       async function loadBestScaleFromSupabase() {
-        if (!isLoggedIn) return;
+        if (!isLoggedIn || !currentFileName) return;
 
         const {
           data: { user },
@@ -1089,6 +2729,7 @@
           .from("user_settings")
           .select("best_scale")
           .eq("user_id", user.id)
+          .eq("file_name", currentFileName)
           .single();
 
         if (error) {
@@ -1097,7 +2738,10 @@
         }
 
         if (data && data.best_scale) {
-          localStorage.setItem("easyPdfBestScale", data.best_scale);
+          localStorage.setItem(
+            `easyPdfBestScale_${currentFileName}`,
+            data.best_scale,
+          );
         }
       }
 
@@ -1116,9 +2760,21 @@
 
           clearTimeout(timeoutId);
 
-          isLoggedIn = !!user;
-          // 缓存认证状态到本地
-          localStorage.setItem("easyPdfAuth", JSON.stringify(isLoggedIn));
+          // 获取当前缓存的登录状态
+          const cachedAuth = localStorage.getItem("easyPdfAuth");
+          const cachedLoginStatus = cachedAuth ? JSON.parse(cachedAuth) : false;
+
+          // 只有在缓存状态为未登录且服务器返回有用户时，才更新为已登录
+          // 这样可以确保初始设置的未登录状态不会被覆盖
+          if (!cachedLoginStatus && user) {
+            isLoggedIn = true;
+            localStorage.setItem("easyPdfAuth", "true");
+          } else if (cachedLoginStatus && !user) {
+            // 如果缓存状态为已登录但服务器返回无用户，更新为未登录
+            isLoggedIn = false;
+            localStorage.setItem("easyPdfAuth", "false");
+          }
+          // 其他情况保持当前状态不变
 
           if (user) {
             // 登录后同步最佳比例
@@ -1141,7 +2797,7 @@
 
       // 更新缩放输入框
       function updateScaleInput() {
-        scaleInput.value = (scale * 100).toFixed(1);
+        scaleInput.textContent = `${(scale * 100).toFixed(1)}%`;
       }
 
       // 重新计算画布物理尺寸
@@ -1159,6 +2815,12 @@
           canvas.style.width = `${w}px`;
           canvas.style.height = `${h}px`;
           if (offscreenCanvas) {
+            // 重新计算偏移量，保持PDF居中
+            const viewport = currentPage.getViewport({ scale: 1 });
+            const viewportWidth = viewport.width * scale * dpr;
+            const viewportHeight = viewport.height * scale * dpr;
+            offsetX = (canvas.width - viewportWidth) / 2;
+            offsetY = (canvas.height - viewportHeight) / 2;
             drawCanvas();
           }
 
@@ -1166,11 +2828,6 @@
           // 这样动画时就会使用新的视口尺寸生成的渲染结果，避免跳动
           fullContentRender = null;
           bestScaleRender = null;
-
-          // 如果已登录且有PDF文件加载，重新生成渲染结果
-          if (isLoggedIn && currentPage) {
-            resetView().catch((err) => console.error("重置视图失败:", err));
-          }
         }
       }
 
@@ -1180,38 +2837,6 @@
 
         ctx.fillStyle = "#f0f0f0";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#888";
-
-        // 字体高度为响应式设计，无最大字高限制
-        const fontSize = window.innerHeight * 0.025 * dpr; // 字体高度为视口高度的2.5%
-        ctx.font = `${fontSize}px sans-serif`;
-        ctx.textAlign = "left";
-
-        // 绘制多行段落文字
-        const lines = [
-          "EasyPDF的文件要求：",
-          "1.网页仅识别PDF文件，且小于1MB；",
-          "2.文件内容中应包含1mx1m正方形，以便投影现场标定；",
-          "3.PDF文件应清晰整洁，格式参照合同附图标准，仅保留必要信息。",
-        ];
-
-        const lineHeight = fontSize * 1.6; // 行高为字体高度的1.6倍
-        const totalHeight = lines.length * lineHeight;
-        const startY = (canvas.height - totalHeight) / 2 + lineHeight * 0.8; // 垂直居中
-
-        // 找到最长的行，计算段落块宽度
-        let maxWidth = 0;
-        lines.forEach((line) => {
-          const width = ctx.measureText(line).width;
-          if (width > maxWidth) maxWidth = width;
-        });
-
-        // 计算段落块的起始X坐标，使段落块中心对齐视口中心
-        const startX = (canvas.width - maxWidth) / 2;
-
-        lines.forEach((line, index) => {
-          ctx.fillText(line, startX, startY + index * lineHeight);
-        });
       }
 
       // 将离屏画布绘制到主canvas
@@ -1224,6 +2849,14 @@
         if (isNavVisible) {
           updateViewportNav();
         }
+      }
+
+      // 触发canvas渐入动画（用于新PDF加载时）
+      function triggerCanvasFadeIn() {
+        // 使用requestAnimationFrame在下一帧触发渐入
+        requestAnimationFrame(() => {
+          canvas.style.opacity = "1";
+        });
       }
 
       // 刷新完整渲染（重新渲染PDF到离屏画布）
@@ -1318,6 +2951,47 @@
         if (isNavVisible) {
           updateViewportIndicator();
         }
+        // 发送视口信息到手柄
+        sendViewportInfo();
+      }
+
+      // 发送视口信息到手柄
+      function sendViewportInfo() {
+        if (!currentPage) return;
+
+        const viewport = currentPage.getViewport({ scale: 1 });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+
+        // 获取canvas尺寸（使用window.innerWidth/innerHeight确保获取真实屏幕尺寸）
+        // 不要使用canvasArea.getBoundingClientRect()，因为它可能被工具栏等元素遮挡导致尺寸不准确
+        const canvasWidth = window.innerWidth;
+        const canvasHeight = window.innerHeight;
+
+        // 获取设备像素比（用于物理像素和逻辑像素转换）
+        const dpr = window.devicePixelRatio || 1;
+
+        // 计算视口在页面上的位置和大小（相对于PDF页面坐标）
+        // offsetX 和 offsetY 是物理像素，需要先转换为逻辑像素（除以dpr），再除以缩放比例得到PDF页面坐标
+        const viewportLeft = -offsetX / dpr / scale;
+        const viewportTop = -offsetY / dpr / scale;
+
+        // 视口大小 = 电脑端屏幕大小 / 缩放比例
+        // 这是视口在PDF页面上的实际大小（PDF页面坐标）
+        // 不限制视口大小，允许视口方框正常变大并溢出屏幕
+        const viewportWidth = canvasWidth / scale;
+        const viewportHeight = canvasHeight / scale;
+
+        sendToController({
+          type: "viewport",
+          left: viewportLeft,
+          top: viewportTop,
+          width: viewportWidth,
+          height: viewportHeight,
+          pageWidth: pageWidth,
+          pageHeight: pageHeight,
+          scale: scale,
+        });
       }
 
       // 重置视图为完整显示（不留边距）
@@ -1360,7 +3034,9 @@
         fullCtx.drawImage(tempOffscreenCanvas, 0, 0);
 
         // 检查是否有保存的最佳比例
-        const bestScale = localStorage.getItem("easyPdfBestScale");
+        const bestScale = localStorage.getItem(
+          `easyPdfBestScale_${currentFileName}`,
+        );
         let finalScale = newScale; // 默认使用全屏显示比例
 
         if (useSavedBestScale && bestScale) {
@@ -1422,6 +3098,10 @@
       }
 
       // ==================== PDF 加载核心 ====================
+
+      // PDF缓存：key为storagePath，value为缓存的文件数据
+      const pdfCache = new Map();
+
       async function loadPDFFromBuffer(buffer, fileName, storagePath = null) {
         // 检查登录状态
         if (!isLoggedIn) {
@@ -1429,7 +3109,8 @@
           return;
         }
         try {
-          showLoading(true, "加载渲染...");
+          showLoading(true, "Loading...");
+
           if (pdfDoc) pdfDoc.destroy?.();
           currentPage = null;
           offscreenCanvas = null;
@@ -1483,6 +3164,10 @@
 
           console.log("进度: 100% - 加载完成");
 
+          // 计算全内容显示比例（最小缩放比例）
+          fitScale = calculateFitScale();
+          console.log("全内容显示比例（最小缩放比例）:", fitScale);
+
           // 创建离屏画布并初始化
           const viewport = currentPage.getViewport({ scale: 1 });
           const renderScale = scale * dpr;
@@ -1492,9 +3177,24 @@
           offscreenCanvas.width = w;
           offscreenCanvas.height = h;
 
+          // 设置canvas为透明，准备渐入动画
+          canvas.style.opacity = "0";
+          void canvas.offsetHeight; // 触发重排
+
           // 直接调用 resetView，使用全屏显示比例（不使用保存的最佳比例）
           await resetView(false);
           showLoading(false);
+
+          // 触发canvas渐入动画
+          triggerCanvasFadeIn();
+
+          // 关闭二维码容器
+          const qrcodeContainer = document.getElementById(
+            "mainQrcodeContainer",
+          );
+          if (qrcodeContainer) {
+            qrcodeContainer.parentElement.style.display = "none";
+          }
 
           // 安全地复制ArrayBuffer
           if (buffer instanceof ArrayBuffer) {
@@ -1512,6 +3212,19 @@
 
           // 检查最佳比例状态
           checkBestScaleStatus();
+
+          // 隐藏控制区域（二维码区域已移除）
+
+          // 发送文件打开消息到手柄端（通知手机端有新文件）
+          // 手机端会发送屏幕尺寸信息，然后电脑端发送渲染好的图片
+          // 重置上次发送的方向，让手机端重新获取图片
+          lastSentOrientation = null;
+
+          sendToController({
+            type: "fileOpened",
+            fileName: fileName,
+            hasFile: true,
+          });
         } catch (err) {
           console.error("加载PDF失败", err);
           showLoading(false);
@@ -1527,11 +3240,35 @@
           return;
         }
         try {
+          // 立即显示Loading提示
+          showLoading(true, "Loading...");
+
+          // 检查缓存
+          if (pdfCache.has(storagePath)) {
+            console.log("使用缓存的PDF:", storagePath);
+            const cachedData = pdfCache.get(storagePath);
+            // 创建buffer副本，避免detached ArrayBuffer问题
+            // 使用Uint8Array复制整个buffer，确保得到完整的新buffer
+            const uint8Array = new Uint8Array(cachedData.buffer);
+            const bufferCopy = uint8Array.slice().buffer;
+            await loadPDFFromBuffer(bufferCopy, fileName, storagePath);
+            return;
+          }
+
           const { data, error } = await supabaseClient.storage
             .from("PDFs")
             .download(storagePath);
           if (error) throw error;
           const buffer = await data.arrayBuffer();
+
+          // 缓存文件数据（创建副本避免原始数据被修改）
+          const cachedBuffer = new Uint8Array(buffer).slice().buffer;
+          pdfCache.set(storagePath, {
+            buffer: cachedBuffer,
+            fileName: fileName,
+            timestamp: Date.now(),
+          });
+
           await loadPDFFromBuffer(buffer, fileName, storagePath);
         } catch (err) {
           console.error("历史文件加载失败", err);
@@ -1804,7 +3541,9 @@
       // 检查当前比例是否接近最佳比例
       const BEST_SCALE_THRESHOLD = 0.02; // 最佳比例阈值，当差异小于2%时认为处于最佳比例状态
       function checkBestScaleStatus() {
-        const bestScale = localStorage.getItem("easyPdfBestScale");
+        const bestScale = localStorage.getItem(
+          `easyPdfBestScale_${currentFileName}`,
+        );
         const icon = document.getElementById("bestScaleIcon");
         if (!bestScale || !icon || !currentPage) return;
 
@@ -1909,8 +3648,8 @@
       });
 
       document.addEventListener("touchmove", (e) => {
-        e.preventDefault();
         if (!isDraggingNav) return;
+        e.preventDefault();
         const touch = e.touches[0];
         const newX = navStartX + (touch.clientX - navDragStartX);
         const newY = navStartY + (touch.clientY - navDragStartY);
@@ -1990,17 +3729,6 @@
       });
 
       // 语音按钮点击事件，切换导航视口显示状态
-      let isVoiceBtnLongPress = false; // 是否是长按操作
-      const voiceBtn = document.getElementById("thumbCard");
-      if (voiceBtn) {
-        voiceBtn.addEventListener("click", (e) => {
-          e.stopPropagation(); // 阻止事件冒泡
-          // 如果不是长按操作，则切换导航视口显示状态
-          if (!isVoiceBtnLongPress) {
-            toggleViewportNav();
-          }
-        });
-      }
 
       // 更新视口导航窗口
       function updateViewportNav() {
@@ -2183,7 +3911,7 @@
           gridContainer.style.width = "100%";
           gridContainer.style.height = "100%";
           gridContainer.style.pointerEvents = "none"; // 不影响页面元素的交互功能
-          gridContainer.style.zIndex = "9999";
+          gridContainer.style.zIndex = "100";
           gridContainer.style.userSelect = "none";
           // 根据gridVisible状态设置显示属性
           gridContainer.style.display = gridVisible ? "block" : "none";
@@ -2233,12 +3961,13 @@
             horizontalLine.style.width = "100%";
             horizontalLine.style.height = "1px";
 
-            // 每4份的分界线清晰（透明度0.8），其他线透明度0.1
+            // 每4份的分界线清晰（透明度0.85），其他线透明度0.15，颜色加深
             const isMajorLine = i % 4 === 0;
-            const opacity = isMajorLine ? 0.8 : 0.1;
-            horizontalLine.style.backgroundColor = `rgba(200, 200, 200, ${opacity})`;
+            const opacity = isMajorLine ? 0.85 : 0.15;
+            horizontalLine.style.backgroundColor = `rgba(150, 150, 150, ${opacity})`;
 
-            horizontalLine.style.zIndex = "9999";
+            // z-index分布：细线100，粗线101，颜色102
+            horizontalLine.style.zIndex = isMajorLine ? "101" : "100";
             gridContainer.appendChild(horizontalLine);
             console.log(
               `创建横向网格线 at y=${y}px, ${isMajorLine ? "主线条" : "次线条"}`,
@@ -2259,12 +3988,13 @@
             verticalLine.style.height = "100%";
             verticalLine.style.width = "1px";
 
-            // 每4份的分界线清晰（透明度0.8），其他线透明度0.1
+            // 每4份的分界线清晰（透明度0.85），其他线透明度0.15，颜色加深
             const isMajorLine = i % 4 === 0;
-            const opacity = isMajorLine ? 0.8 : 0.1;
-            verticalLine.style.backgroundColor = `rgba(200, 200, 200, ${opacity})`;
+            const opacity = isMajorLine ? 0.85 : 0.15;
+            verticalLine.style.backgroundColor = `rgba(150, 150, 150, ${opacity})`;
 
-            verticalLine.style.zIndex = "9999";
+            // z-index分布：细线100，粗线101，颜色102
+            verticalLine.style.zIndex = isMajorLine ? "101" : "100";
             gridContainer.appendChild(verticalLine);
             console.log(
               `创建竖向网格线 at x=${x}px, ${isMajorLine ? "主线条" : "次线条"}`,
@@ -2275,56 +4005,70 @@
         // 添加边缘填充
         // 计算边缘填充区域的高度/宽度（基于基础单位）
         const edgePadding = baseUnit;
+        const FILL_TRANSITION =
+          "transform 0.3s ease-out, opacity 0.3s ease-out";
 
         // 上边缘填充 - #22B14C（绿色）
         const topFill = document.createElement("div");
+        topFill.className = "edge-fill top";
         topFill.style.position = "absolute";
         topFill.style.top = "0";
         topFill.style.left = "0";
         topFill.style.width = "100%";
         topFill.style.height = `${edgePadding}px`;
         topFill.style.backgroundColor = "#22B14C";
-        topFill.style.opacity = "0.5";
-        topFill.style.zIndex = "9998";
+        topFill.style.opacity = "0";
+        topFill.style.transform = "translateY(-100%)";
+        topFill.style.transition = FILL_TRANSITION;
+        topFill.style.zIndex = "102";
         gridContainer.appendChild(topFill);
         console.log(`创建上边缘填充，高度: ${edgePadding}px`);
 
         // 下边缘填充 - #FFF200（黄色）
         const bottomFill = document.createElement("div");
+        bottomFill.className = "edge-fill bottom";
         bottomFill.style.position = "absolute";
         bottomFill.style.bottom = "0";
         bottomFill.style.left = "0";
         bottomFill.style.width = "100%";
         bottomFill.style.height = `${edgePadding}px`;
         bottomFill.style.backgroundColor = "#FFF200";
-        bottomFill.style.opacity = "0.5";
-        bottomFill.style.zIndex = "9998";
+        bottomFill.style.opacity = "0";
+        bottomFill.style.transform = "translateY(100%)";
+        bottomFill.style.transition = FILL_TRANSITION;
+        bottomFill.style.zIndex = "102";
         gridContainer.appendChild(bottomFill);
         console.log(`创建下边缘填充，高度: ${edgePadding}px`);
 
         // 左边缘填充 - #3F48CC（蓝色）
         const leftFill = document.createElement("div");
+        leftFill.className = "edge-fill left";
         leftFill.style.position = "absolute";
         leftFill.style.top = "0";
         leftFill.style.left = "0";
         leftFill.style.width = `${edgePadding}px`;
         leftFill.style.height = "100%";
         leftFill.style.backgroundColor = "#3F48CC";
-        leftFill.style.opacity = "0.5";
-        leftFill.style.zIndex = "9998";
+        leftFill.style.opacity = "0";
+        leftFill.style.transform = "translateX(-100%)";
+        leftFill.style.transition = FILL_TRANSITION;
+        leftFill.style.zIndex = "102";
         gridContainer.appendChild(leftFill);
         console.log(`创建左边缘填充，宽度: ${edgePadding}px`);
 
         // 右边缘填充 - #ED1C24（红色）
         const rightFill = document.createElement("div");
+        rightFill.className = "edge-fill right";
         rightFill.style.position = "absolute";
         rightFill.style.top = "0";
         rightFill.style.right = "0";
         rightFill.style.width = `${edgePadding}px`;
         rightFill.style.height = "100%";
         rightFill.style.backgroundColor = "#ED1C24";
-        rightFill.style.opacity = "0.5";
-        rightFill.style.zIndex = "9998";
+        rightFill.style.opacity = "0";
+        rightFill.style.transform = "translateX(100%)";
+        rightFill.style.transition = FILL_TRANSITION;
+        rightFill.style.zIndex = "102";
         gridContainer.appendChild(rightFill);
         console.log(`创建右边缘填充，宽度: ${edgePadding}px`);
 
@@ -2341,27 +4085,84 @@
           // 切换网格可见性
           gridVisible = !gridVisible;
 
-          // 添加动画效果，动画时间0.1秒
-          gridContainer.style.transition = "opacity 0.1s ease";
-
           if (gridVisible) {
-            // 显示网格
+            // 显示网格 - 分步动画
             gridContainer.style.opacity = "0";
             gridContainer.style.display = "block";
             // 重新创建网格以确保正确的布局
             createGridSystem();
             // 触发重排
             void gridContainer.offsetWidth;
-            // 设置透明度为1
+
+            // 第一步：线条先渐现
+            gridContainer.style.transition = "opacity 0.3s ease-out";
             gridContainer.style.opacity = "1";
+
+            // 第二步：100ms后四边颜色弹出（从各自边缘滑入）
+            setTimeout(() => {
+              const topFill = gridContainer.querySelector(".edge-fill.top");
+              const bottomFill =
+                gridContainer.querySelector(".edge-fill.bottom");
+              const leftFill = gridContainer.querySelector(".edge-fill.left");
+              const rightFill = gridContainer.querySelector(".edge-fill.right");
+
+              // 四边颜色同时弹出
+              if (topFill) {
+                topFill.style.opacity = "0.5";
+                topFill.style.transform = "translateY(0)";
+              }
+              if (bottomFill) {
+                bottomFill.style.opacity = "0.5";
+                bottomFill.style.transform = "translateY(0)";
+              }
+              if (leftFill) {
+                leftFill.style.opacity = "0.5";
+                leftFill.style.transform = "translateX(0)";
+              }
+              if (rightFill) {
+                rightFill.style.opacity = "0.5";
+                rightFill.style.transform = "translateX(0)";
+              }
+            }, 100);
+
             console.log("坐标系已打开");
           } else {
-            // 隐藏网格
-            gridContainer.style.opacity = "0";
-            // 动画结束后完全隐藏
+            // 隐藏网格 - 分步动画
+            // 获取四边颜色元素
+            const topFill = gridContainer.querySelector(".edge-fill.top");
+            const bottomFill = gridContainer.querySelector(".edge-fill.bottom");
+            const leftFill = gridContainer.querySelector(".edge-fill.left");
+            const rightFill = gridContainer.querySelector(".edge-fill.right");
+
+            // 第一步：四边颜色先弹出（滑出到各自边缘）
+            if (topFill) {
+              topFill.style.opacity = "0";
+              topFill.style.transform = "translateY(-100%)";
+            }
+            if (bottomFill) {
+              bottomFill.style.opacity = "0";
+              bottomFill.style.transform = "translateY(100%)";
+            }
+            if (leftFill) {
+              leftFill.style.opacity = "0";
+              leftFill.style.transform = "translateX(-100%)";
+            }
+            if (rightFill) {
+              rightFill.style.opacity = "0";
+              rightFill.style.transform = "translateX(100%)";
+            }
+
+            // 第二步：100ms后线条渐隐
             setTimeout(() => {
-              gridContainer.style.display = "none";
+              gridContainer.style.transition = "opacity 0.3s ease-out";
+              gridContainer.style.opacity = "0";
+
+              // 动画结束后完全隐藏
+              setTimeout(() => {
+                gridContainer.style.display = "none";
+              }, 300);
             }, 100);
+
             console.log("坐标系已关闭");
           }
         }
@@ -2382,6 +4183,29 @@
         window.addEventListener("resize", () => {
           if (gridVisible) {
             createGridSystem();
+            // 重新设置四边颜色的显示状态（包括位置和透明度）
+            const gridContainer = document.getElementById("grid-container");
+            const topFill = gridContainer.querySelector(".edge-fill.top");
+            const bottomFill = gridContainer.querySelector(".edge-fill.bottom");
+            const leftFill = gridContainer.querySelector(".edge-fill.left");
+            const rightFill = gridContainer.querySelector(".edge-fill.right");
+
+            if (topFill) {
+              topFill.style.opacity = "0.5";
+              topFill.style.transform = "translateY(0)";
+            }
+            if (bottomFill) {
+              bottomFill.style.opacity = "0.5";
+              bottomFill.style.transform = "translateY(0)";
+            }
+            if (leftFill) {
+              leftFill.style.opacity = "0.5";
+              leftFill.style.transform = "translateX(0)";
+            }
+            if (rightFill) {
+              rightFill.style.opacity = "0.5";
+              rightFill.style.transform = "translateX(0)";
+            }
           }
         });
 
@@ -2496,8 +4320,13 @@
       function toggleLock() {
         locked = !locked;
         const lockIcon = lockBtnEl.querySelector("img");
-        lockIcon.src = locked ? "assets/icon/锁定.svg" : "assets/icon/开锁.svg";
+        lockIcon.src = locked
+          ? "assets/icon/lock.svg"
+          : "assets/icon/unlock.svg";
         lockIcon.alt = locked ? "锁定" : "开锁";
+
+        // 控制工具栏显示/隐藏
+        const topBar = document.getElementById("topBar");
 
         // 控制提示显示
         if (locked) {
@@ -2505,6 +4334,8 @@
           if (!wasFullscreenBeforeLock) toggleFullscreen();
           app.classList.add("locked-mode");
           lockBtnEl.classList.add("locked");
+          topBar.classList.remove("show");
+          topBar.style.transform = ""; // 重置内联样式，确保CSS类生效
           console.log("进入锁定模式：双击屏幕可打开/关闭坐标系");
         } else {
           if (document.fullscreenElement && !wasFullscreenBeforeLock) {
@@ -2514,6 +4345,8 @@
           }
           app.classList.remove("locked-mode");
           lockBtnEl.classList.remove("locked");
+          topBar.style.transform = ""; // 重置内联样式，确保CSS类生效
+          topBar.classList.add("show");
 
           // 解锁状态下保持网格状态不变
           console.log("解锁状态：网格状态保持不变");
@@ -2533,9 +4366,20 @@
         isFullscreen = !!document.fullscreenElement;
         const fullscreenIcon = fullscreenBtn.querySelector("img");
         fullscreenIcon.src = isFullscreen
-          ? "assets/icon/还原画布.svg"
-          : "assets/icon/全屏画布.svg";
+          ? "assets/icon/reset.svg"
+          : "assets/icon/fullscreen.svg";
         fullscreenIcon.alt = isFullscreen ? "还原" : "全屏";
+
+        // 确保工具栏在全屏状态下仍然正确显示
+        const topBar = document.getElementById("topBar");
+        if (topBar.classList.contains("show")) {
+          // 使用类切换实现动画效果，避免覆盖CSS样式
+          topBar.classList.remove("show");
+          // 强制重排
+          topBar.offsetHeight;
+          // 然后显示工具栏，实现从顶部弹出的效果
+          topBar.classList.add("show");
+        }
       });
 
       // ==================== 画布交互 ====================
@@ -2737,11 +4581,10 @@
       }
 
       async function init() {
-        // 优先使用本地缓存的认证状态
-        const cachedAuth = localStorage.getItem("easyPdfAuth");
-        if (cachedAuth) {
-          isLoggedIn = JSON.parse(cachedAuth);
-        }
+        // 初始加载时强制设置为未登录状态
+        // 等待 WebSocket 请求服务器确认后再更新
+        isLoggedIn = false;
+        localStorage.setItem("easyPdfAuth", "false");
 
         // 异步检查认证状态，不阻塞页面初始化
         checkAuthStatus().then(() => {
@@ -2867,13 +4710,23 @@
           }
         });
 
-        scaleInput.addEventListener("change", () => {
+        // 缩放按钮点击事件 - 点击切换导航窗口
+        scaleInput.addEventListener("click", () => {
           if (locked) return;
-          let val = parseFloat(scaleInput.value);
-          if (isNaN(val)) val = 100;
-          val = Math.min(200000, val); // 统一为2000倍 = 200000%
-          scaleAtPoint(val / 100, canvas.width / 2, canvas.height / 2);
+          // 未登录时显示登录框
+          if (!isLoggedIn) {
+            showLoginOverlay();
+            return;
+          }
+          if (!currentPage) return;
+          // 切换导航窗口
+          toggleViewportNav();
         });
+
+        // 设置缩放值的方法（供其他地方调用）
+        function setScaleValue(value) {
+          scaleInput.textContent = `${value.toFixed(1)}%`;
+        }
 
         // 最佳比例按钮 - 双击保存最佳比例，长按重置最佳比例
         let isBestScaleSaved = false; // 标记是否已保存最佳比例
@@ -2936,9 +4789,15 @@
           const fullScreenScale = Math.min(canvasW / imgW, canvasH / imgH);
 
           // 重置最佳比例为全屏显示比例
-          localStorage.setItem("easyPdfBestScale", fullScreenScale.toString());
+          localStorage.setItem(
+            `easyPdfBestScale_${currentFileName}`,
+            fullScreenScale.toString(),
+          );
           // 清除用户保存标记
-          localStorage.setItem("easyPdfUserSavedBestScale", "false");
+          localStorage.setItem(
+            `easyPdfUserSavedBestScale_${currentFileName}`,
+            "false",
+          );
 
           // 更新最佳比例的暂存渲染结果
           const bestScaleViewport = currentPage.getViewport({
@@ -2971,7 +4830,8 @@
           console.log(`已重置最佳比例为全屏显示比例: ${fullScreenScale}`);
         }
 
-        bestScaleBtn.addEventListener("dblclick", async () => {
+        // 存储最佳比例的处理函数
+        async function handleSaveBestScale() {
           if (locked) return;
 
           isBestScaleSaved = true;
@@ -2984,8 +4844,11 @@
           }
 
           // 存储当前比例为最佳比例到本地（标记为用户保存）
-          localStorage.setItem("easyPdfBestScale", scale);
-          localStorage.setItem("easyPdfUserSavedBestScale", "true");
+          localStorage.setItem(`easyPdfBestScale_${currentFileName}`, scale);
+          localStorage.setItem(
+            `easyPdfUserSavedBestScale_${currentFileName}`,
+            "true",
+          );
 
           // 重新计算并更新最佳比例的暂存渲染结果
           if (currentPage && offscreenCanvas) {
@@ -3026,7 +4889,87 @@
           isUsingBestScale = true;
           // 检查最佳比例状态
           checkBestScaleStatus();
-        });
+        }
+
+        // 鼠标双击事件
+        bestScaleBtn.addEventListener("dblclick", handleSaveBestScale);
+
+        // 触摸事件处理 - 同时支持双击保存和长按重置
+        let lastBestScaleTouchTime = 0;
+        let bestScaleTouchTimer = null;
+        const BEST_SCALE_DOUBLE_TAP_DELAY = 300;
+
+        // 触摸开始事件
+        bestScaleBtn.addEventListener(
+          "touchstart",
+          (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 添加视觉反馈效果
+            bestScaleBtn.style.transform = "scale(0.94)";
+
+            const currentTime = new Date().getTime();
+            const tapLength = e.touches.length;
+
+            if (tapLength === 1) {
+              if (
+                currentTime - lastBestScaleTouchTime <
+                BEST_SCALE_DOUBLE_TAP_DELAY
+              ) {
+                // 检测到触摸双击 - 保存最佳比例
+                if (bestScaleTouchTimer) {
+                  clearTimeout(bestScaleTouchTimer);
+                  bestScaleTouchTimer = null;
+                }
+                handleSaveBestScale();
+              } else {
+                // 可能是单击或长按，设置长按定时器
+                bestScaleTouchTimer = setTimeout(() => {
+                  // 长按触发，重置最佳比例
+                  resetBestScale();
+                  bestScaleTouchTimer = null;
+                }, BEST_SCALE_LONG_PRESS_DURATION);
+              }
+              lastBestScaleTouchTime = currentTime;
+            }
+          },
+          { passive: false, capture: true },
+        );
+
+        // 触摸结束事件
+        bestScaleBtn.addEventListener(
+          "touchend",
+          (e) => {
+            e.stopPropagation();
+            // 恢复按钮视觉效果
+            bestScaleBtn.style.transform = "";
+
+            // 清除长按定时器
+            if (bestScaleTouchTimer) {
+              clearTimeout(bestScaleTouchTimer);
+              bestScaleTouchTimer = null;
+            }
+          },
+          { passive: true, capture: true },
+        );
+
+        // 触摸取消事件
+        bestScaleBtn.addEventListener(
+          "touchcancel",
+          (e) => {
+            e.stopPropagation();
+            // 恢复按钮视觉效果
+            bestScaleBtn.style.transform = "";
+
+            lastBestScaleTouchTime = 0;
+            if (bestScaleTouchTimer) {
+              clearTimeout(bestScaleTouchTimer);
+              bestScaleTouchTimer = null;
+            }
+          },
+          { passive: true, capture: true },
+        );
 
         // 显示提示信息
         function showToast(message) {
@@ -3042,22 +4985,24 @@
 
         // 同步最佳比例到Supabase
         async function syncBestScaleToSupabase(scaleValue) {
-          if (!isLoggedIn) return;
+          if (!isLoggedIn) throw new Error("用户未登录");
+          if (!currentFileName) throw new Error("未打开PDF文件");
 
           const {
             data: { user },
           } = await supabaseClient.auth.getUser();
-          if (!user) return;
+          if (!user) throw new Error("认证状态失效");
 
           // 存储最佳比例到用户配置表
           const { error } = await supabaseClient.from("user_settings").upsert(
             {
               user_id: user.id,
+              file_name: currentFileName,
               best_scale: scaleValue,
               updated_at: new Date().toISOString(),
             },
             {
-              onConflict: "user_id",
+              onConflict: "user_id,file_name",
             },
           );
 
@@ -3155,9 +5100,9 @@
           const currentScale = scale * 100;
           const integerPart = Math.floor(currentScale);
           const newScale = integerPart + controlBarValue / 10;
-          scaleInput.value = newScale.toFixed(1);
-          // 触发 change 事件
-          scaleInput.dispatchEvent(new Event("change"));
+          scaleInput.textContent = `${newScale.toFixed(1)}%`;
+          // 直接调用缩放方法
+          scaleAtPoint(newScale / 100, canvas.width / 2, canvas.height / 2);
         }
 
         function closeControlBar(e) {
@@ -3199,7 +5144,9 @@
           if (!currentPage) return;
 
           isAnimating = true;
-          const bestScale = localStorage.getItem("easyPdfBestScale");
+          const bestScale = localStorage.getItem(
+            `easyPdfBestScale_${currentFileName}`,
+          );
           const icon = document.getElementById("bestScaleIcon");
 
           // 计算全内容可看比例（全局比例）
@@ -3210,6 +5157,19 @@
             // 检查当前是否处于最佳比例状态
             const isCurrentBestScale =
               Math.abs(scale - savedBestScale) < BEST_SCALE_THRESHOLD;
+
+            // 检查最佳比例和全部内容显示比例是否相等，且当前比例为全屏显示比例
+            const isBestScaleEqualContentScale =
+              Math.abs(savedBestScale - contentVisibleScale) <
+              BEST_SCALE_THRESHOLD;
+            const isCurrentFullContentScale =
+              Math.abs(scale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
+
+            if (isBestScaleEqualContentScale && isCurrentFullContentScale) {
+              // 最佳比例和全部内容显示比例相等，且当前比例为全屏显示比例，不进行动画
+              isAnimating = false;
+              return;
+            }
 
             if (isCurrentBestScale) {
               // 从最佳比例切换到全局比例
@@ -3307,7 +5267,9 @@
             Math.abs(startScale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
           const isTargetFullContent =
             Math.abs(targetScale - contentVisibleScale) < BEST_SCALE_THRESHOLD;
-          const bestScale = localStorage.getItem("easyPdfBestScale");
+          const bestScale = localStorage.getItem(
+            `easyPdfBestScale_${currentFileName}`,
+          );
           const savedBestScale = bestScale
             ? parseFloat(bestScale)
             : contentVisibleScale * 2;
@@ -3348,123 +5310,43 @@
               const centerY = canvas.height / 2;
 
               // 使用不同的渲染策略
-              if (animationType === "fullToBest") {
-                // 当由全屏显示比例到最佳比例，由全屏显示比例放大后平滑过渡到最佳比例
-                if (fullContentRender) {
-                  try {
-                    const currentRenderScale =
-                      currentScale / contentVisibleScale;
-                    const fullWidth =
-                      fullContentRender.width * currentRenderScale;
-                    const fullHeight =
-                      fullContentRender.height * currentRenderScale;
+              if (
+                (animationType === "fullToBest" ||
+                  animationType === "bestToFull" ||
+                  animationType === "anyToBest") &&
+                fullContentRender
+              ) {
+                // 当使用特殊动画类型且有fullContentRender时，使用特殊渲染方式
+                try {
+                  const currentRenderScale = currentScale / contentVisibleScale;
+                  const fullWidth =
+                    fullContentRender.width * currentRenderScale;
+                  const fullHeight =
+                    fullContentRender.height * currentRenderScale;
 
-                    // 计算绘制位置（以屏幕中心为锚点）
-                    const drawX = centerX - fullWidth / 2;
-                    const drawY = centerY - fullHeight / 2;
+                  // 计算绘制位置（以屏幕中心为锚点）
+                  const drawX = centerX - fullWidth / 2;
+                  const drawY = centerY - fullHeight / 2;
 
-                    // 绘制缩放后的内容
-                    ctx.drawImage(
-                      fullContentRender,
-                      drawX,
-                      drawY,
-                      fullWidth,
-                      fullHeight,
-                    );
-                  } catch (e) {
-                    console.error("动画渲染失败", e);
-                  }
+                  // 绘制缩放后的内容
+                  ctx.drawImage(
+                    fullContentRender,
+                    drawX,
+                    drawY,
+                    fullWidth,
+                    fullHeight,
+                  );
+                } catch (e) {
+                  console.error("动画渲染失败", e);
                 }
-                // 提前开始平滑过渡到最佳比例渲染结果
-                if (progress > 0.7 && bestScaleRender) {
-                  try {
-                    // 计算透明度，从0逐渐增加到1，使用更快速的过渡
-                    const alpha = (progress - 0.7) / 0.3;
-                    // 使用缓动函数使透明度变化更自然
-                    const easedAlpha = 1 - Math.pow(1 - alpha, 3);
-                    ctx.globalAlpha = easedAlpha;
 
-                    const bestWidth = bestScaleRender.width;
-                    const bestHeight = bestScaleRender.height;
-
-                    // 计算绘制位置（以屏幕中心为锚点）
-                    const drawX = centerX - bestWidth / 2;
-                    const drawY = centerY - bestHeight / 2;
-
-                    // 绘制最佳比例的内容
-                    ctx.drawImage(
-                      bestScaleRender,
-                      drawX,
-                      drawY,
-                      bestWidth,
-                      bestHeight,
-                    );
-
-                    // 重置透明度
-                    ctx.globalAlpha = 1;
-                  } catch (e) {
-                    console.error("动画渲染失败", e);
-                  }
-                }
-              } else if (animationType === "bestToFull") {
-                // 当由最佳比例到全屏显示比例，第一帧变为全屏显示放大结果，开始缩小至全屏显示
-                if (progress > 0) {
-                  // 动画过程中使用全内容显示的渲染结果放大后缩小
-                  if (fullContentRender) {
-                    try {
-                      const currentRenderScale =
-                        currentScale / contentVisibleScale;
-                      const fullWidth =
-                        fullContentRender.width * currentRenderScale;
-                      const fullHeight =
-                        fullContentRender.height * currentRenderScale;
-
-                      // 计算绘制位置（以屏幕中心为锚点）
-                      const drawX = centerX - fullWidth / 2;
-                      const drawY = centerY - fullHeight / 2;
-
-                      // 绘制缩放后的内容
-                      ctx.drawImage(
-                        fullContentRender,
-                        drawX,
-                        drawY,
-                        fullWidth,
-                        fullHeight,
-                      );
-                    } catch (e) {
-                      console.error("动画渲染失败", e);
-                    }
-                  }
-                }
-              } else if (animationType === "anyToBest") {
-                // 当由任意比例到最佳比例，第一帧为全屏显示放大结果，开始缩放至最佳比例，最后平滑过渡到最佳比例
-                if (fullContentRender) {
-                  try {
-                    const currentRenderScale =
-                      currentScale / contentVisibleScale;
-                    const fullWidth =
-                      fullContentRender.width * currentRenderScale;
-                    const fullHeight =
-                      fullContentRender.height * currentRenderScale;
-
-                    // 计算绘制位置（以屏幕中心为锚点）
-                    const drawX = centerX - fullWidth / 2;
-                    const drawY = centerY - fullHeight / 2;
-
-                    // 绘制缩放后的内容
-                    ctx.drawImage(
-                      fullContentRender,
-                      drawX,
-                      drawY,
-                      fullWidth,
-                      fullHeight,
-                    );
-                  } catch (e) {
-                    console.error("动画渲染失败", e);
-                  }
-                }
-                // 提前开始平滑过渡到最佳比例渲染结果
-                if (progress > 0.7 && bestScaleRender) {
+                // 提前开始平滑过渡到最佳比例渲染结果（仅在向最佳比例过渡时）
+                if (
+                  (animationType === "fullToBest" ||
+                    animationType === "anyToBest") &&
+                  progress > 0.7 &&
+                  bestScaleRender
+                ) {
                   try {
                     // 计算透明度，从0逐渐增加到1，使用更快速的过渡
                     const alpha = (progress - 0.7) / 0.3;
@@ -3523,8 +5405,8 @@
                 }
               }
 
-              // 更新缩放输入框（使用当前动画比例，不触发渲染）
-              scaleInput.value = (currentScale * 100).toFixed(1);
+              // 更新缩放按钮显示（使用当前动画比例，不触发渲染）
+              scaleInput.textContent = `${(currentScale * 100).toFixed(1)}%`;
 
               // 调用进度回调函数
               if (onProgress) {
@@ -3613,103 +5495,25 @@
           toggleLock();
         });
 
-        // 语音按钮
-        let thumbCardLongPressTimer = null; // 语音按钮长按检测定时器
-
-        thumbCard.addEventListener("mousedown", () => {
-          if (!isLoggedIn) {
-            showLoginOverlay();
-            return;
-          }
-          // 重置长按标志
-          isVoiceBtnLongPress = false;
-          // 开始长按检测
-          thumbCardLongPressTimer = setTimeout(() => {
-            // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
-            thumbCard.style.background = "#333333";
-            const icon = thumbCard.querySelector("img");
-            if (icon) {
-              icon.style.filter = "brightness(0) invert(1)";
-            }
-            // 设置长按标志
-            isVoiceBtnLongPress = true;
-          }, 500); // 500ms长按
-        });
-
-        thumbCard.addEventListener("mouseup", () => {
-          // 取消长按检测
-          if (thumbCardLongPressTimer) {
-            clearTimeout(thumbCardLongPressTimer);
-            thumbCardLongPressTimer = null;
-          }
-          // 恢复原始状态
-          thumbCard.style.background = "#c3c3c3";
-          const icon = thumbCard.querySelector("img");
-          if (icon) {
-            icon.style.filter = "none";
-          }
-        });
-
-        thumbCard.addEventListener("mouseleave", () => {
-          // 取消长按检测
-          if (thumbCardLongPressTimer) {
-            clearTimeout(thumbCardLongPressTimer);
-            thumbCardLongPressTimer = null;
-          }
-          // 恢复原始状态
-          thumbCard.style.background = "#c3c3c3";
-          const icon = thumbCard.querySelector("img");
-          if (icon) {
-            icon.style.filter = "none";
-          }
-        });
-
-        // 触摸设备支持
-        thumbCard.addEventListener("touchstart", () => {
-          if (!isLoggedIn) {
-            showLoginOverlay();
-            return;
-          }
-          // 重置长按标志
-          isVoiceBtnLongPress = false;
-          // 开始长按检测
-          thumbCardLongPressTimer = setTimeout(() => {
-            // 长按开始：磨砂玻璃变为深灰色，icon变为灰白色
-            thumbCard.style.background = "#333333";
-            const icon = thumbCard.querySelector("img");
-            if (icon) {
-              icon.style.filter = "brightness(0) invert(1)";
-            }
-            // 设置长按标志
-            isVoiceBtnLongPress = true;
-          }, 500); // 500ms长按
-        });
-
-        thumbCard.addEventListener("touchend", () => {
-          // 取消长按检测
-          if (thumbCardLongPressTimer) {
-            clearTimeout(thumbCardLongPressTimer);
-            thumbCardLongPressTimer = null;
-          }
-          // 恢复原始状态
-          thumbCard.style.background = "#c3c3c3";
-          const icon = thumbCard.querySelector("img");
-          if (icon) {
-            icon.style.filter = "none";
-          }
-        });
+        // 语音按钮：已移除所有事件绑定
 
         // 初始显示
         resizeCanvas();
         drawWelcomeMessage();
         // 初始检查最佳比例状态
         checkBestScaleStatus();
+        // 默认显示顶部工具栏和底部工具栏（同步弹出）
+        document.getElementById("topBar").classList.add("show");
+        document.getElementById("bottomToolbar").classList.add("show");
 
         // 不自动加载历史文件，等待用户主动点击按钮
         // const history = await fetchHistoryList();
         // if (history.length > 0) {
         //   await loadFromSupabase(history[0].storage_path, history[0].file_name);
         // }
+
+        // 初始化手柄按钮事件
+        initControllerButton();
 
         // 页面刷新前保存状态到 Session Storage
         window.addEventListener("beforeunload", () => {
@@ -3719,6 +5523,14 @@
             offsetY: offsetY,
           };
           sessionStorage.setItem("easyPdfTempState", JSON.stringify(tempState));
+
+          // 清理二维码缓存
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith("qrcode_")) {
+              localStorage.removeItem(key);
+            }
+          });
+          console.log("二维码缓存已清理");
         });
       }
 

@@ -1,0 +1,1609 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>工具栏演示</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: #f5f5f5;
+        font-family: system-ui, "Segoe UI", "Helvetica Neue", sans-serif;
+      }
+
+      /* 画布区域 */
+      .canvas-area {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #f5f5f5;
+        cursor: grab;
+        z-index: 1;
+        opacity: 1;
+      }
+
+      .canvas-area:active {
+        cursor: grabbing;
+      }
+
+      /* 登录界面 */
+      .login-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .login-overlay.show {
+        display: flex;
+        opacity: 1;
+      }
+      .login-form {
+        background: #c2c2c2;
+        backdrop-filter: blur(20px);
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4vh;
+        width: 40vh;
+        min-width: 280px;
+        max-width: 90vw;
+        height: auto;
+        max-height: 80vh;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2vh;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+      .login-overlay.show .login-form {
+        transform: scale(1);
+      }
+      .login-title {
+        color: #333333;
+        font-size: 3vh;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 1vh;
+      }
+      .login-input-group {
+        margin-bottom: 0;
+      }
+      .login-input {
+        width: 100%;
+        background: white;
+        border: 1px solid #999999;
+        border-radius: 6px;
+        padding: 2vh 2.5vh;
+        color: #333333;
+        font-size: 2.2vh;
+        outline: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+      .login-input:focus {
+        border-color: #ff9800;
+        background: white;
+      }
+      .login-button {
+        width: 100%;
+        background: #ff9800;
+        border: none;
+        border-radius: 6px;
+        padding: 2vh;
+        color: white;
+        font-size: 2.2vh;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 1vh;
+      }
+      .login-button:hover {
+        background: #f57c00;
+        transform: translateY(-1px);
+      }
+      .login-button:active {
+        transform: translateY(0);
+      }
+      .login-error {
+        color: #f44336;
+        font-size: 1.8vh;
+        text-align: center;
+        margin-top: 1vh;
+        min-height: 2.5vh;
+      }
+
+      /* 顶部磨砂工具栏 (透明度0.1) */
+      .top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(30, 30, 38, 0.25);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 200;
+        padding: 8px 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transform: translateY(-100%);
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+
+      .top-bar,
+      .top-bar.show {
+        transition:
+          transform 0.3s ease-in-out,
+          opacity 0.3s ease-in-out;
+      }
+
+      .top-bar.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .toolbar-group {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: center;
+        gap: 2vh;
+      }
+
+      /* 圆形按钮 */
+      .circle-btn {
+        width: 12.5vh;
+        height: 12.5vh;
+        min-width: 44px;
+        min-height: 44px;
+        border-radius: 9999px;
+        background: #c3c3c3;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #333333;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+        font-size: 20px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        transform: translateZ(0);
+        will-change: transform;
+      }
+
+      .circle-btn:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .circle-btn:active {
+        transform: scale(0.94);
+      }
+
+      /* 图标样式 */
+      .btn-icon {
+        width: 50%;
+        height: 50%;
+        min-width: 20px;
+        min-height: 20px;
+        fill: #c2c2c2;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        display: block;
+        transition: filter 0.3s ease;
+        pointer-events: none; /* 点击事件穿透 */
+      }
+
+      /* 设置面板 */
+      .settings-modal {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: rgba(30, 30, 38, 0.95);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 16px;
+        z-index: 300;
+        min-width: 200px;
+        display: none;
+      }
+
+      /* 比例设置弹窗 */
+      .ratio-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+      .ratio-overlay.show {
+        display: flex;
+        opacity: 1;
+      }
+      .ratio-form {
+        background: #c2c2c2;
+        backdrop-filter: blur(20px);
+        border-radius: 6px;
+        pointer-events: auto;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4vh;
+        width: 40vh;
+        min-width: 280px;
+        max-width: 90vw;
+        height: auto;
+        max-height: 80vh;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2vh;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+      .ratio-overlay.show .ratio-form {
+        transform: scale(1);
+      }
+      .ratio-title {
+        color: #333333;
+        font-size: 3vh;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 1vh;
+        cursor: grab;
+        user-select: none;
+      }
+      .ratio-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 1vh;
+      }
+      .ratio-label {
+        color: #333333;
+        font-size: 2.2vh;
+        font-weight: 500;
+      }
+      .ratio-slider {
+        width: 100%;
+        height: 6px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: white;
+        border-radius: 3px;
+        outline: none;
+        cursor: pointer;
+      }
+      .ratio-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        background: #ff9800;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+      .ratio-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+      }
+      .ratio-select {
+        width: 100%;
+        padding: 2vh;
+        border: 1px solid #999999;
+        border-radius: 6px;
+        background: white;
+        color: #333333;
+        font-size: 2.2vh;
+        cursor: pointer;
+        outline: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 16px;
+      }
+      .ratio-select:focus {
+        border-color: #ff9800;
+      }
+      .ratio-button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 1vh;
+      }
+      .ratio-button {
+        flex: 1;
+        padding: 2vh;
+        border-radius: 6px;
+        font-size: 2.2vh;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+      }
+      .ratio-button.cancel-btn {
+        background: #e0e0e0;
+        color: #333333;
+      }
+      .ratio-button.cancel-btn:hover {
+        background: #d0d0d0;
+      }
+      .ratio-button.confirm-btn {
+        background: #ff9800;
+        color: white;
+      }
+      .ratio-button.confirm-btn:hover {
+        background: #f57c00;
+      }
+
+      .settings-modal.show {
+        display: block;
+      }
+
+      .modal-title {
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      /* 背景预览 */
+      .bg-preview {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .bg-option {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+      }
+
+      .bg-option.active {
+        border-color: #4a90d9;
+      }
+
+      .bg-option:hover {
+        transform: scale(1.1);
+      }
+
+      /* 加载遮罩 */
+      .loading-mask {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(12px);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 60px;
+        font-size: 15px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      /* 省略号动画 */
+      .loading-dots {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .loading-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #c2c2c2;
+        margin: 0 2px;
+        opacity: 0;
+        animation: dotFade 1.4s infinite ease-in-out;
+      }
+
+      .loading-dot:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .loading-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .loading-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes dotFade {
+        0%,
+        80%,
+        100% {
+          opacity: 0;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+
+      /* PDF容器渐入动画 */
+      .canvas-area {
+        opacity: 1;
+        transition: opacity 0.5s ease-out;
+      }
+
+      .canvas-area.fade-in {
+        opacity: 1;
+      }
+
+      .canvas-area.fade-out {
+        opacity: 0;
+      }
+
+      /* 控制区域容器 */
+      .control-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: transparent;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        z-index: 160;
+        display: flex;
+        gap: 2vh;
+        align-items: center;
+        justify-content: center;
+        height: calc(100vh / 7);
+        width: calc(6 * 12.5vh + 5 * 2vh);
+        min-width: calc(6 * 44px + 5 * 8px);
+        max-width: 90%;
+        box-sizing: border-box;
+        animation: fadeIn 0.3s ease-out forwards;
+        opacity: 0;
+      }
+
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
+
+      /* 图片容器 */
+      .image-container,
+      #imageOuterContainer {
+        flex-shrink: 0;
+        width: auto;
+        height: 100%;
+        aspect-ratio: 1;
+        background: #fff;
+        padding: 4px;
+        margin: 0;
+        border-radius: 1.6px;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      .image-container img,
+      #imageOuterContainer img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* 响应式 */
+      @media (max-width: 640px) {
+        .circle-btn {
+          width: 40px;
+          height: 40px;
+          font-size: 18px;
+        }
+        .toolbar-group {
+          gap: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 顶部工具栏 -->
+    <div class="top-bar" id="topBar">
+      <div class="toolbar-group">
+        <!-- 历史记录按钮 -->
+        <button class="circle-btn" id="historyBtn" title="历史记录">
+          <img src="assets/icon/ratio.svg" alt="历史记录" class="btn-icon" />
+        </button>
+
+        <!-- 手柄连接按钮 -->
+        <button class="circle-btn" id="controllerBtn" title="手柄连接">
+          <img src="assets/icon/rivet.svg" alt="手柄连接" class="btn-icon" />
+        </button>
+
+        <!-- 背景切换按钮 -->
+        <button class="circle-btn" id="bgToggleBtn" title="切换背景">
+          <img src="assets/icon/screen.svg" alt="切换背景" class="btn-icon" />
+        </button>
+
+        <!-- 全屏按钮 -->
+        <button class="circle-btn" id="fullscreenBtn" title="全屏">
+          <img src="assets/icon/fullscreen.svg" alt="全屏" class="btn-icon" />
+        </button>
+      </div>
+    </div>
+
+    <!-- 背景选择面板 -->
+    <div class="settings-modal" id="bgModal">
+      <div class="modal-title">背景选择</div>
+      <div class="bg-preview">
+        <div
+          class="bg-option active"
+          style="background: #f5f5f5"
+          data-bg="#f5f5f5"
+        ></div>
+        <div
+          class="bg-option"
+          style="background: #ffffff"
+          data-bg="#ffffff"
+        ></div>
+        <div
+          class="bg-option"
+          style="background: #e8e8e8"
+          data-bg="#e8e8e8"
+        ></div>
+        <div
+          class="bg-option"
+          style="background: #2a2a2a"
+          data-bg="#2a2a2a"
+        ></div>
+        <div
+          class="bg-option"
+          style="background: #1a1a2e"
+          data-bg="#1a1a2e"
+        ></div>
+        <div
+          class="bg-option"
+          style="background: #f0f0f0"
+          data-bg="#f0f0f0"
+        ></div>
+      </div>
+    </div>
+
+    <!-- 比例设置弹窗 -->
+    <div class="ratio-overlay" id="ratioOverlay">
+      <div class="ratio-form">
+        <h2 class="ratio-title">比例设置</h2>
+        <div class="ratio-input-group">
+          <label class="ratio-label">X：<span id="xValue">100</span>%</label>
+          <input
+            type="range"
+            class="ratio-slider"
+            id="xSlider"
+            min="1"
+            max="200"
+            value="100"
+          />
+        </div>
+        <div class="ratio-input-group">
+          <label class="ratio-label">Y：<span id="yValue">100</span>%</label>
+          <input
+            type="range"
+            class="ratio-slider"
+            id="ySlider"
+            min="1"
+            max="200"
+            value="100"
+          />
+        </div>
+        <div class="ratio-input-group">
+          <label class="ratio-label">锚点</label>
+          <select class="ratio-select" id="anchorSelect">
+            <option value="top-left">左上角</option>
+            <option value="top-center">上中</option>
+            <option value="top-right">右上角</option>
+            <option value="center-left">左中</option>
+            <option value="center">中心</option>
+            <option value="center-right">右中</option>
+            <option value="bottom-left">左下角</option>
+            <option value="bottom-center">下中</option>
+            <option value="bottom-right">右下角</option>
+          </select>
+        </div>
+        <div class="ratio-button-group">
+          <button class="ratio-button cancel-btn" id="ratioCancelBtn">
+            取消
+          </button>
+          <button class="ratio-button confirm-btn" id="ratioConfirmBtn">
+            确认
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 无控制端提示弹窗 -->
+    <div class="login-overlay" id="noControllerOverlay">
+      <div class="login-form" id="noControllerForm">
+        <h2 class="login-title">无控制端</h2>
+        <p
+          style="
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+            font-size: 14px;
+          "
+        >
+          请在主页端或手机端登录后再操作
+        </p>
+      </div>
+    </div>
+
+    <!-- 加载遮罩 -->
+    <div id="loadingMask" class="loading-mask" style="display: none">
+      <span class="loading-dots">
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+      </span>
+    </div>
+
+    <!-- logo容器 -->
+    <div
+      id="controlContainer"
+      style="
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: transparent;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        z-index: 160;
+        display: flex;
+        gap: 2vh;
+        align-items: center;
+        justify-content: center;
+        height: calc(100vh / 7);
+        width: calc(1 * 12.5vh + 0 * 2vh);
+        min-width: calc(1 * 44px + 0 * 8px);
+        max-width: 90%;
+        box-sizing: border-box;
+        animation: fadeIn 0.3s ease-out forwards;
+        opacity: 0;
+      "
+    >
+      <div
+        id="imageOuterContainer"
+        style="
+          position: relative;
+          flex-shrink: 0;
+          width: auto;
+          height: 100%;
+          aspect-ratio: 1;
+          background: #fff;
+          padding: 4px;
+          margin: 0;
+          border-radius: 1.6px;
+          overflow: hidden;
+          box-sizing: border-box;
+        "
+      >
+        <img
+          src="assets/icon/easypdfmain.jpg"
+          alt="EasyPDF"
+          style="width: 100%; height: 100%; object-fit: cover"
+        />
+      </div>
+    </div>
+
+    <!-- 画布区域 -->
+    <div class="canvas-area" id="canvas"></div>
+
+    <script>
+      // Supabase配置
+      const SUPABASE_URL = "https://zwnluqynchoidpiittdp.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "sb_publishable_bmgWwgQxTGMf0r8tyqyTHg__3g7osn1";
+      const supabaseClient = supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+      );
+
+      // DOM元素
+      const topBar = document.getElementById("topBar");
+      const bgModal = document.getElementById("bgModal");
+      const canvas = document.getElementById("canvas");
+      const loadingMask = document.getElementById("loadingMask");
+
+      // 是否有控制端连接（主页端或手机端已登录）
+      let hasController = false;
+      console.log("🔐 分屏页面初始化 - hasController:", hasController);
+
+      // 屏幕管理相关变量
+      let currentWindowId = null;
+
+      // 生成/获取windowId
+      function getCurrentWindowId() {
+        if (!currentWindowId) {
+          currentWindowId = localStorage.getItem("easypdf_window_id");
+          if (!currentWindowId) {
+            currentWindowId =
+              "window_" +
+              Date.now() +
+              "_" +
+              Math.random().toString(36).substr(2, 9);
+            localStorage.setItem("easypdf_window_id", currentWindowId);
+          }
+        }
+        return currentWindowId;
+      }
+
+      // WebSocket连接
+      let ws = null;
+
+      // 初始化WebSocket
+      function initWebSocket() {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        // 从URL参数获取session
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get("session") || "default";
+        const windowId = urlParams.get("window") || getCurrentWindowId();
+        // 添加session和type参数
+        const url = `${protocol}//${host}/ws?session=${sessionId}&type=main&window=${windowId}`;
+
+        ws = new WebSocket(url);
+
+        ws.onopen = function () {
+          onWebSocketOpen();
+        };
+
+        ws.onmessage = function (event) {
+          const message = JSON.parse(event.data);
+          handleMessage(message);
+        };
+
+        ws.onerror = function (error) {
+          console.error("WebSocket错误:", error);
+        };
+
+        ws.onclose = function () {
+          console.log("WebSocket连接已关闭");
+          // 尝试重新连接
+          setTimeout(initWebSocket, 5000);
+        };
+      }
+
+      // 分屏幕加载历史文件
+      async function loadHistoryFileOnScreen(command) {
+        // 检查是否是次屏
+        const myWindowId = getCurrentWindowId();
+        if (command.screens && Array.isArray(command.screens)) {
+          const myScreen = command.screens.find(
+            (s) => s.windowId === myWindowId,
+          );
+          // 如果是主屏，不处理（让主屏自己处理）
+          if (myScreen && myScreen.isMain) {
+            return;
+          }
+        }
+
+        // 显示加载提示
+        loadingMask.style.display = "flex";
+
+        try {
+          // 使用Supabase SDK直接下载文件（与主页相同方式）
+          const { data, error } = await supabaseClient.storage
+            .from("PDFs")
+            .download(command.storagePath);
+
+          if (error) throw error;
+
+          const buffer = await data.arrayBuffer();
+
+          // 创建PDF查看器
+          createPDFViewer(buffer, command.fileName);
+        } catch (error) {
+          console.error("加载文件失败:", error);
+        } finally {
+          loadingMask.style.display = "none";
+        }
+      }
+
+      // PDF相关变量
+      let pdfDoc = null;
+      let currentPage = null;
+      let offscreenCanvas = null;
+      const dpr = window.devicePixelRatio || 1;
+      let isDarkMode = false; // 当前是否是深色模式
+
+      // 计算全内容显示比例（使整个PDF页面刚好适应屏幕）
+      function calculateFitScale(page) {
+        if (!page) return 1.0;
+
+        const viewport = page.getViewport({ scale: 1 });
+        const pageWidth = viewport.width;
+        const pageHeight = viewport.height;
+
+        // 获取容器尺寸
+        const rect = canvas.getBoundingClientRect();
+        const screenWidth = rect.width || window.innerWidth;
+        const screenHeight = rect.height || window.innerHeight;
+
+        // 计算适应宽度和高度的缩放比例，取较小值
+        const scaleX = screenWidth / pageWidth;
+        const scaleY = screenHeight / pageHeight;
+
+        return Math.min(scaleX, scaleY);
+      }
+
+      // 创建PDF查看器（与主页面一致的加载逻辑）
+      async function createPDFViewer(buffer, fileName) {
+        // 清空画布区域
+        canvas.innerHTML = "";
+        // 开始加载时设置为透明，准备渐入动画
+        canvas.classList.remove("fade-in");
+        canvas.classList.add("fade-out");
+        // 隐藏logo容器（与主页逻辑一致）
+        const controlContainer = document.getElementById("controlContainer");
+        if (controlContainer) {
+          controlContainer.style.display = "none";
+        }
+
+        try {
+          // 使用PDF.js加载PDF
+          const task = pdfjsLib.getDocument({
+            data: buffer,
+            useSystemFonts: true,
+          });
+
+          pdfDoc = await task.promise;
+          currentPage = await pdfDoc.getPage(1);
+
+          // 计算全内容显示比例
+          const fitScale = calculateFitScale(currentPage);
+          console.log("分屏全内容显示比例:", fitScale);
+
+          // 创建离屏画布并渲染（先计算好比例再渲染）
+          const viewport = currentPage.getViewport({ scale: fitScale * dpr });
+
+          // 白色背景黑色线条的渲染
+          offscreenCanvas = document.createElement("canvas");
+          offscreenCanvas.width = viewport.width;
+          offscreenCanvas.height = viewport.height;
+          const ctx = offscreenCanvas.getContext("2d");
+
+          // 渲染PDF页面到离屏画布
+          await currentPage.render({
+            canvasContext: ctx,
+            viewport: viewport,
+            background: "white",
+          }).promise;
+
+          // 创建显示用的canvas元素
+          const displayCanvas = document.createElement("canvas");
+          displayCanvas.width = viewport.width;
+          displayCanvas.height = viewport.height;
+          displayCanvas.style.width = "100%";
+          displayCanvas.style.height = "100%";
+          displayCanvas.style.objectFit = "contain";
+          displayCanvas.id = "displayCanvas";
+
+          const displayCtx = displayCanvas.getContext("2d");
+          displayCtx.drawImage(offscreenCanvas, 0, 0);
+
+          canvas.appendChild(displayCanvas);
+
+          // 设置初始背景
+          const bgColor = isDarkMode ? "#000000" : "#f5f5f5";
+          canvas.style.background = bgColor;
+          document.body.style.background = bgColor;
+
+          // 如果当前是深色模式，应用反色并移除阴影
+          if (isDarkMode) {
+            invertCanvasColors(displayCanvas);
+            canvas.style.boxShadow = "none";
+          }
+        } catch (error) {
+          console.error("PDF渲染失败:", error);
+        }
+
+        // 触发canvas渐入动画
+        triggerCanvasFadeIn();
+      }
+
+      // 对画布进行反色处理
+      function invertCanvasColors(targetCanvas) {
+        if (!targetCanvas) return;
+
+        const ctx = targetCanvas.getContext("2d");
+        const imageData = ctx.getImageData(
+          0,
+          0,
+          targetCanvas.width,
+          targetCanvas.height,
+        );
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          // 反转颜色（保留Alpha通道）
+          data[i] = 255 - data[i]; // R
+          data[i + 1] = 255 - data[i + 1]; // G
+          data[i + 2] = 255 - data[i + 2]; // B
+          // A保持不变
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+      }
+
+      // 触发canvas渐入动画（用于新PDF加载时）
+      function triggerCanvasFadeIn() {
+        requestAnimationFrame(() => {
+          canvas.classList.remove("fade-out");
+          canvas.classList.add("fade-in");
+        });
+      }
+
+      // 显示重复屏幕提醒
+      function showDuplicateScreenAlert(message) {
+        let alertDiv = document.getElementById("duplicateAlert");
+        if (!alertDiv) {
+          alertDiv = document.createElement("div");
+          alertDiv.id = "duplicateAlert";
+          alertDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            z-index: 9999;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+          `;
+          document.body.appendChild(alertDiv);
+        }
+        alertDiv.textContent = message;
+        alertDiv.style.display = "block";
+        alertDiv.style.opacity = "1";
+
+        setTimeout(() => {
+          if (alertDiv) {
+            alertDiv.style.transition = "opacity 0.3s ease-out";
+            alertDiv.style.opacity = "0";
+            setTimeout(() => {
+              alertDiv.style.display = "none";
+            }, 300);
+          }
+        }, 3000);
+      }
+
+      // 无控制端提示相关函数
+      function showNoControllerAlert() {
+        const overlay = document.getElementById("noControllerOverlay");
+        const form = document.getElementById("noControllerForm");
+        overlay.style.display = "flex";
+        setTimeout(() => {
+          overlay.classList.add("show");
+        }, 10);
+
+        // 添加点击外部关闭功能
+        const closeHandler = (e) => {
+          if (e.target === overlay) {
+            hideNoControllerAlert();
+            overlay.removeEventListener("click", closeHandler);
+          }
+        };
+        overlay.addEventListener("click", closeHandler);
+      }
+
+      function hideNoControllerAlert() {
+        const overlay = document.getElementById("noControllerOverlay");
+        overlay.classList.remove("show");
+        setTimeout(() => {
+          overlay.style.display = "none";
+        }, 300);
+      }
+
+      // 请求登录状态
+      function requestLoginStatus() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "getLoginStatus",
+            }),
+          );
+        }
+      }
+
+      // 跳转到主页
+      function navigateToMainPage() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get("session") || "default";
+        const windowId = urlParams.get("window") || getCurrentWindowId();
+        const date =
+          urlParams.get("date") || new Date().toISOString().split("T")[0];
+
+        const targetUrl = `${window.location.protocol}//${window.location.host}/?session=${sessionId}&date=${date}&window=${windowId}`;
+
+        if (window.location.href !== targetUrl) {
+          console.log("跳转到主屏页面:", targetUrl);
+          window.location.href = targetUrl;
+        }
+      }
+
+      // 页面加载完成后显示工具栏（与主页一致）
+      window.addEventListener("load", () => {
+        console.log("页面加载完成");
+        // 初始化WebSocket
+        initWebSocket();
+        // 延迟显示工具栏，实现弹出动画效果
+        setTimeout(() => {
+          topBar.classList.add("show");
+        }, 100);
+
+        // 默认显示无控制端提示（等待控制端连接）
+        showNoControllerAlert();
+      });
+
+      // WebSocket连接成功后请求登录状态
+      function onWebSocketOpen() {
+        console.log("WebSocket连接已建立");
+        // 请求登录状态
+        requestLoginStatus();
+      }
+
+      // 背景切换按钮功能 - 需要检查控制端连接
+      const bgToggleBtn = document.getElementById("bgToggleBtn");
+      bgToggleBtn.addEventListener("click", () => {
+        if (!hasController) {
+          showNoControllerAlert();
+          return;
+        }
+        // 切换模式
+        isDarkMode = !isDarkMode;
+        toggleRenderMode();
+      });
+
+      // 切换渲染模式（白色背景黑色线条 <-> 黑色背景白色线条）
+      function toggleRenderMode() {
+        const displayCanvas = document.getElementById("displayCanvas");
+        if (!displayCanvas || !offscreenCanvas) return;
+
+        const ctx = displayCanvas.getContext("2d");
+
+        if (isDarkMode) {
+          // 切换到黑色背景白色线条
+          invertCanvasColors(displayCanvas);
+          canvas.style.background = "#000000";
+          document.body.style.background = "#000000";
+          // 移除canvas阴影或设为黑色
+          canvas.style.boxShadow = "none";
+        } else {
+          // 切换到白色背景黑色线条
+          ctx.drawImage(offscreenCanvas, 0, 0);
+          canvas.style.background = "#f5f5f5";
+          document.body.style.background = "#f5f5f5";
+          // 恢复阴影
+          canvas.style.boxShadow = "";
+        }
+      }
+
+      // 全屏按钮功能
+      const fullscreenBtn = document.getElementById("fullscreenBtn");
+      fullscreenBtn.addEventListener("click", () => {
+        toggleFullscreen();
+      });
+
+      // 全屏切换函数（供远程调用）
+      function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }
+
+      // 全屏状态变化时切换图标
+      document.addEventListener("fullscreenchange", () => {
+        const isFullscreen = !!document.fullscreenElement;
+        const fullscreenIcon = fullscreenBtn.querySelector("img");
+        fullscreenIcon.src = isFullscreen
+          ? "assets/icon/reset.svg"
+          : "assets/icon/fullscreen.svg";
+        fullscreenIcon.alt = isFullscreen ? "还原" : "全屏";
+        fullscreenBtn.title = isFullscreen ? "还原" : "全屏";
+      });
+
+      // 比例设置弹窗功能
+      const historyBtn = document.getElementById("historyBtn");
+      const ratioOverlay = document.getElementById("ratioOverlay");
+      const xSlider = document.getElementById("xSlider");
+      const ySlider = document.getElementById("ySlider");
+      const xValue = document.getElementById("xValue");
+      const yValue = document.getElementById("yValue");
+      const ratioCancelBtn = document.getElementById("ratioCancelBtn");
+      const ratioConfirmBtn = document.getElementById("ratioConfirmBtn");
+
+      // 保存原始比例值
+      let originalXValue = 100;
+      let originalYValue = 100;
+
+      // 点击弹窗外部不关闭弹窗，允许页面其他操作
+
+      // 弹窗拖拽功能
+      let isDragging = false;
+      let startX, startY, offsetX, offsetY;
+
+      const ratioForm = document.querySelector(".ratio-form");
+
+      const ratioTitle = ratioForm.querySelector(".ratio-title");
+
+      ratioTitle.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = ratioForm.getBoundingClientRect();
+        offsetX = startX - rect.left;
+        offsetY = startY - rect.top;
+        ratioTitle.style.cursor = "grabbing";
+        e.stopPropagation();
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+
+        const newX = e.clientX - offsetX;
+        const newY = e.clientY - offsetY;
+
+        const maxX = window.innerWidth - ratioForm.offsetWidth;
+        const maxY = window.innerHeight - ratioForm.offsetHeight;
+        const boundedX = Math.max(0, Math.min(newX, maxX));
+        const boundedY = Math.max(0, Math.min(newY, maxY));
+
+        ratioForm.style.position = "fixed";
+        ratioForm.style.left = boundedX + "px";
+        ratioForm.style.top = boundedY + "px";
+        ratioForm.style.transform = "none";
+      });
+
+      document.addEventListener("mouseup", () => {
+        isDragging = false;
+        ratioTitle.style.cursor = "default";
+      });
+
+      // 取消按钮
+      ratioCancelBtn.addEventListener("click", () => {
+        // 恢复原始值
+        xSlider.value = originalXValue;
+        ySlider.value = originalYValue;
+        xValue.textContent = originalXValue;
+        yValue.textContent = originalYValue;
+        ratioOverlay.classList.remove("show");
+
+        // 隐藏坐标系（直接隐藏，不切换）
+        hideCoordinateSystem();
+      });
+
+      // 确认按钮
+      ratioConfirmBtn.addEventListener("click", () => {
+        // 应用比例设置（这里可以添加实际的比例应用逻辑）
+        console.log(
+          "应用比例设置 - X: " + xSlider.value + "%, Y: " + ySlider.value + "%",
+        );
+        ratioOverlay.classList.remove("show");
+
+        // 隐藏坐标系（直接隐藏，不切换）
+        hideCoordinateSystem();
+      });
+
+      // X向滑块值更新
+      xSlider.addEventListener("input", () => {
+        xValue.textContent = xSlider.value;
+      });
+
+      // Y向滑块值更新
+      ySlider.addEventListener("input", () => {
+        yValue.textContent = ySlider.value;
+      });
+
+      // ==================== 坐标系系统 ====================
+      let gridVisible = false;
+
+      function createGridSystem() {
+        let gridContainer = document.getElementById("grid-container");
+        if (!gridContainer) {
+          gridContainer = document.createElement("div");
+          gridContainer.id = "grid-container";
+          gridContainer.style.position = "fixed";
+          gridContainer.style.top = "0";
+          gridContainer.style.left = "0";
+          gridContainer.style.width = "100%";
+          gridContainer.style.height = "100%";
+          gridContainer.style.pointerEvents = "none";
+          gridContainer.style.zIndex = "100";
+          gridContainer.style.userSelect = "none";
+          gridContainer.style.display = gridVisible ? "block" : "none";
+          document.body.appendChild(gridContainer);
+        } else {
+          gridContainer.style.display = gridVisible ? "block" : "none";
+        }
+
+        gridContainer.innerHTML = "";
+
+        const screenWidth = window.screen.width;
+        const screenHeight = window.screen.height;
+        const totalDivisions = 29;
+        const baseUnit = screenHeight / totalDivisions;
+        const majorLineSpacing = baseUnit * 4;
+
+        const centerX = screenWidth / 2;
+        const centerY = screenHeight / 2;
+
+        const halfVerticalDivisions = Math.ceil(centerX / baseUnit);
+        const halfHorizontalDivisions = Math.ceil(centerY / baseUnit);
+
+        // 创建横向网格线
+        for (
+          let i = -halfHorizontalDivisions;
+          i <= halfHorizontalDivisions;
+          i++
+        ) {
+          const y = centerY + i * baseUnit;
+          if (y >= 0 && y <= screenHeight) {
+            const horizontalLine = document.createElement("div");
+            horizontalLine.style.position = "absolute";
+            horizontalLine.style.top = `${y}px`;
+            horizontalLine.style.left = "0";
+            horizontalLine.style.width = "100%";
+            horizontalLine.style.height = "1px";
+            const isMajorLine = i % 4 === 0;
+            const opacity = isMajorLine ? 0.85 : 0.15;
+            horizontalLine.style.backgroundColor = `rgba(150, 150, 150, ${opacity})`;
+            horizontalLine.style.zIndex = isMajorLine ? "101" : "100";
+            gridContainer.appendChild(horizontalLine);
+          }
+        }
+
+        // 创建竖向网格线
+        for (let i = -halfVerticalDivisions; i <= halfVerticalDivisions; i++) {
+          const x = centerX + i * baseUnit;
+          if (x >= 0 && x <= screenWidth) {
+            const verticalLine = document.createElement("div");
+            verticalLine.style.position = "absolute";
+            verticalLine.style.left = `${x}px`;
+            verticalLine.style.top = "0";
+            verticalLine.style.height = "100%";
+            verticalLine.style.width = "1px";
+            const isMajorLine = i % 4 === 0;
+            const opacity = isMajorLine ? 0.85 : 0.15;
+            verticalLine.style.backgroundColor = `rgba(150, 150, 150, ${opacity})`;
+            verticalLine.style.zIndex = isMajorLine ? "101" : "100";
+            gridContainer.appendChild(verticalLine);
+          }
+        }
+
+        // 添加边缘填充
+        const edgePadding = baseUnit;
+        const FILL_TRANSITION =
+          "transform 0.3s ease-out, opacity 0.3s ease-out";
+
+        // 上边缘填充 - 绿色
+        const topFill = document.createElement("div");
+        topFill.className = "edge-fill top";
+        topFill.style.position = "absolute";
+        topFill.style.top = "0";
+        topFill.style.left = "0";
+        topFill.style.width = "100%";
+        topFill.style.height = `${edgePadding}px`;
+        topFill.style.backgroundColor = "#22B14C";
+        topFill.style.opacity = "0";
+        topFill.style.transform = "translateY(-100%)";
+        topFill.style.transition = FILL_TRANSITION;
+        topFill.style.zIndex = "102";
+        gridContainer.appendChild(topFill);
+
+        // 下边缘填充 - 黄色
+        const bottomFill = document.createElement("div");
+        bottomFill.className = "edge-fill bottom";
+        bottomFill.style.position = "absolute";
+        bottomFill.style.bottom = "0";
+        bottomFill.style.left = "0";
+        bottomFill.style.width = "100%";
+        bottomFill.style.height = `${edgePadding}px`;
+        bottomFill.style.backgroundColor = "#FFF200";
+        bottomFill.style.opacity = "0";
+        bottomFill.style.transform = "translateY(100%)";
+        bottomFill.style.transition = FILL_TRANSITION;
+        bottomFill.style.zIndex = "102";
+        gridContainer.appendChild(bottomFill);
+
+        // 左边缘填充 - 蓝色
+        const leftFill = document.createElement("div");
+        leftFill.className = "edge-fill left";
+        leftFill.style.position = "absolute";
+        leftFill.style.top = "0";
+        leftFill.style.left = "0";
+        leftFill.style.width = `${edgePadding}px`;
+        leftFill.style.height = "100%";
+        leftFill.style.backgroundColor = "#3F48CC";
+        leftFill.style.opacity = "0";
+        leftFill.style.transform = "translateX(-100%)";
+        leftFill.style.transition = FILL_TRANSITION;
+        leftFill.style.zIndex = "102";
+        gridContainer.appendChild(leftFill);
+
+        // 右边缘填充 - 红色
+        const rightFill = document.createElement("div");
+        rightFill.className = "edge-fill right";
+        rightFill.style.position = "absolute";
+        rightFill.style.top = "0";
+        rightFill.style.right = "0";
+        rightFill.style.width = `${edgePadding}px`;
+        rightFill.style.height = "100%";
+        rightFill.style.backgroundColor = "#ED1C24";
+        rightFill.style.opacity = "0";
+        rightFill.style.transform = "translateX(100%)";
+        rightFill.style.transition = FILL_TRANSITION;
+        rightFill.style.zIndex = "102";
+        gridContainer.appendChild(rightFill);
+      }
+
+      // 显示坐标系（直接设置为显示状态，不切换）
+      function showCoordinateSystem() {
+        if (gridVisible) return; // 已经显示则不重复操作
+
+        let gridContainer = document.getElementById("grid-container");
+
+        // 如果容器不存在，先创建
+        if (!gridContainer) {
+          gridContainer = document.createElement("div");
+          gridContainer.id = "grid-container";
+          gridContainer.style.position = "fixed";
+          gridContainer.style.top = "0";
+          gridContainer.style.left = "0";
+          gridContainer.style.width = "100%";
+          gridContainer.style.height = "100%";
+          gridContainer.style.pointerEvents = "none";
+          gridContainer.style.zIndex = "100";
+          gridContainer.style.userSelect = "none";
+          gridContainer.style.display = "none";
+          document.body.appendChild(gridContainer);
+        }
+
+        gridVisible = true;
+        gridContainer.style.opacity = "0";
+        gridContainer.style.display = "block";
+        createGridSystem();
+
+        setTimeout(() => {
+          gridContainer.style.opacity = "1";
+        }, 50);
+
+        setTimeout(() => {
+          const topFill = gridContainer.querySelector(".edge-fill.top");
+          const bottomFill = gridContainer.querySelector(".edge-fill.bottom");
+          const leftFill = gridContainer.querySelector(".edge-fill.left");
+          const rightFill = gridContainer.querySelector(".edge-fill.right");
+
+          if (topFill)
+            topFill.style.cssText += ";opacity:0.3;transform:translateY(0)";
+          if (bottomFill)
+            bottomFill.style.cssText += ";opacity:0.3;transform:translateY(0)";
+          if (leftFill)
+            leftFill.style.cssText += ";opacity:0.3;transform:translateX(0)";
+          if (rightFill)
+            rightFill.style.cssText += ";opacity:0.3;transform:translateX(0)";
+        }, 100);
+      }
+
+      // 隐藏坐标系（直接设置为隐藏状态，不切换）
+      function hideCoordinateSystem() {
+        if (!gridVisible) return; // 已经隐藏则不重复操作
+
+        const gridContainer = document.getElementById("grid-container");
+        if (!gridContainer) return;
+
+        gridVisible = false;
+        const topFill = gridContainer.querySelector(".edge-fill.top");
+        const bottomFill = gridContainer.querySelector(".edge-fill.bottom");
+        const leftFill = gridContainer.querySelector(".edge-fill.left");
+        const rightFill = gridContainer.querySelector(".edge-fill.right");
+
+        if (topFill)
+          topFill.style.cssText += ";opacity:0;transform:translateY(-100%)";
+        if (bottomFill)
+          bottomFill.style.cssText += ";opacity:0;transform:translateY(100%)";
+        if (leftFill)
+          leftFill.style.cssText += ";opacity:0;transform:translateX(-100%)";
+        if (rightFill)
+          rightFill.style.cssText += ";opacity:0;transform:translateX(100%)";
+
+        setTimeout(() => {
+          gridContainer.style.opacity = "0";
+        }, 100);
+
+        setTimeout(() => {
+          gridContainer.style.display = "none";
+        }, 300);
+      }
+
+      // 点击比例按钮呼出比例框和坐标系（状态完全同步）
+      historyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+
+        if (!hasController) {
+          showNoControllerAlert();
+          return;
+        }
+
+        showRatioModal();
+      });
+
+      // 显示比例设置弹窗函数（供远程调用）
+      function showRatioModal() {
+        // 呼出比例设置弹窗
+        originalXValue = parseInt(xSlider.value);
+        originalYValue = parseInt(ySlider.value);
+        ratioOverlay.classList.add("show");
+
+        // 显示坐标系（直接显示，不切换）
+        showCoordinateSystem();
+      }
+
+      // 平移模式切换函数（供远程调用）
+      function togglePanMode() {
+        // 切换平移模式（如果有此功能）
+        const canvasArea = document.querySelector(".canvas-area");
+        if (canvasArea) {
+          canvasArea.style.cursor =
+            canvasArea.style.cursor === "grabbing" ? "grab" : "grabbing";
+        }
+      }
+
+      // 处理消息（全局作用域）
+      function handleMessage(message) {
+        console.log("📥 分屏页面收到消息:", message);
+        console.log("   - 当前窗口ID:", getCurrentWindowId());
+        console.log("   - 目标窗口ID:", message.targetWindowId);
+
+        // 检查是否有目标窗口ID，如果有则只处理目标窗口的消息
+        if (
+          message.targetWindowId &&
+          message.targetWindowId !== getCurrentWindowId()
+        ) {
+          console.log("   - 消息不匹配当前窗口，忽略");
+          return;
+        }
+
+        switch (message.type) {
+          case "screenStatus":
+          case "setMainScreen":
+          case "switchScreen":
+            // 处理屏幕状态变化
+            if (message.screens && Array.isArray(message.screens)) {
+              const myWindowId = getCurrentWindowId();
+              const myScreen = message.screens.find(
+                (s) => s.windowId === myWindowId,
+              );
+              if (myScreen && myScreen.isMain) {
+                // 如果变成主屏，跳转到index.html
+                navigateToMainPage();
+              }
+            } else if (message.isMain) {
+              // 兼容旧格式
+              navigateToMainPage();
+            }
+            break;
+          case "duplicateScreen":
+            // 收到重复屏幕提醒
+            showDuplicateScreenAlert(message.message);
+            break;
+          case "loadHistoryFile":
+            // 加载历史文件
+            loadHistoryFileOnScreen(message);
+            break;
+          case "loginStatus":
+            // 处理控制端状态同步
+            console.log("📥 分屏页面收到登录状态:", message.isLoggedIn);
+            if (message.isLoggedIn) {
+              hasController = true;
+              console.log(
+                "✅ 分屏页面更新状态 - hasController:",
+                hasController,
+              );
+              hideNoControllerAlert();
+            } else {
+              hasController = false;
+              console.log(
+                "❌ 分屏页面更新状态 - hasController:",
+                hasController,
+              );
+              showNoControllerAlert();
+            }
+            break;
+          case "showRatioModal":
+            // 次屏控制的比例设置不弹窗，由手机端控制
+            // showRatioModal();
+            break;
+          case "toggleBackground":
+            // 切换背景
+            isDarkMode = !isDarkMode;
+            toggleRenderMode();
+            break;
+          case "fullscreen":
+            // 全屏切换
+            toggleFullscreen();
+            break;
+          case "pan":
+            // 平移模式切换
+            togglePanMode();
+            break;
+          case "setRatio":
+            // 设置比例
+            if (message.x !== undefined && message.y !== undefined) {
+              applyRatio(message.x, message.y, message.anchor);
+            }
+            break;
+        }
+      }
+
+      // 应用比例设置
+      function applyRatio(x, y, anchor) {
+        console.log(`应用比例设置 - X: ${x}%, Y: ${y}%, 锚点: ${anchor}`);
+        // 这里可以添加实际的比例应用逻辑
+        // 更新滑块显示值
+        if (xSlider && ySlider && xValue && yValue) {
+          xSlider.value = x;
+          ySlider.value = y;
+          xValue.textContent = x + "%";
+          yValue.textContent = y + "%";
+        }
+      }
+    </script>
+  </body>
+</html>

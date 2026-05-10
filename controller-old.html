@@ -1,0 +1,2165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>EasyPDF 手机控制</title>
+    <link rel="icon" type="image/jpg" href="assets/icon/easypdfmain.jpg" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Helvetica Neue",
+          "SF Pro Text",
+          sans-serif;
+      }
+
+      body {
+        background: #f0f0f0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        touch-action: none;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+        padding: 0;
+        margin: 0;
+        max-width: none;
+      }
+
+      /* ----- 地图框（上部） ----- */
+      .map-frame {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: hidden;
+        margin-bottom: 0;
+        position: relative;
+        padding: 0;
+      }
+
+      /* 地图框内顶部左右两个小按钮 */
+      .map-top-left {
+        position: absolute;
+        top: 12px;
+        left: 8px;
+        z-index: 10;
+      }
+      .map-top-right {
+        position: absolute;
+        top: 12px;
+        right: 8px;
+        z-index: 10;
+      }
+      .map-small-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 9999px;
+        background: #c3c3c3;
+        border: 1px solid #8a8a8a;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #333333;
+        font-size: 22px;
+        cursor: pointer;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+        transform: translateZ(0);
+      }
+      .map-small-btn:active {
+        transform: scale(0.92);
+        background: #a8a8a8;
+      }
+      .map-small-btn img {
+        width: 50%;
+        height: 50%;
+        filter: grayscale(1) brightness(0);
+      }
+
+      .wheel-inline {
+        position: absolute;
+        width: 36px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+        cursor: grab;
+        overflow: hidden;
+        border-radius: 0;
+        background: transparent;
+        z-index: 5;
+        transition:
+          transform 0.3s ease,
+          opacity 0.3s ease;
+        opacity: 0;
+        pointer-events: none;
+        margin: 0;
+        padding: 0;
+      }
+      .left-wheel {
+        left: 0;
+        transform: translateX(-100%);
+        border: none;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          rgba(30, 30, 38, 0.1) 0px,
+          rgba(30, 30, 38, 0.1) 10px,
+          transparent 10px,
+          transparent 20px
+        );
+        background-size: 2px 20px;
+        background-position: right center;
+        background-repeat: repeat-y;
+      }
+      .right-wheel {
+        right: 0;
+        transform: translateX(100%);
+        border: none;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          rgba(30, 30, 38, 0.1) 0px,
+          rgba(30, 30, 38, 0.1) 10px,
+          transparent 10px,
+          transparent 20px
+        );
+        background-size: 2px 20px;
+        background-position: left center;
+        background-repeat: repeat-y;
+      }
+      .left-wheel.show {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .right-wheel.show {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .map-canvas-container {
+        flex: 1;
+        position: relative;
+      }
+      #mapCanvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        touch-action: none;
+        transform-origin: 0 0;
+        will-change: transform;
+      }
+
+      /* PDF显示区域 */
+      .pdf-viewer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        background: #1a1a1a;
+        overflow: hidden;
+      }
+      .pdf-viewer.active {
+        display: block;
+      }
+      .pdf-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .pdf-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+      }
+
+      /* 方框视口 - 代表主页面当前显示区域 */
+      .viewport-box {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: none;
+        border: 3px solid #3a8cff;
+        background: rgba(58, 140, 255, 0.15);
+        pointer-events: none;
+        z-index: 100;
+        min-width: 10px;
+        min-height: 10px;
+        width: 10px;
+        height: 10px;
+        box-sizing: border-box;
+      }
+
+      /* ----- 工具栏 ----- */
+      .toolbar {
+        flex-shrink: 0;
+        background: rgba(30, 30, 38, 0.25);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: none;
+        border-radius: 0;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        width: 100%;
+        will-change: transform, opacity;
+      }
+
+      .top-toolbar {
+        box-shadow: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        transform: translateY(-100%);
+        opacity: 0;
+        transition:
+          transform 0.3s ease-in-out,
+          opacity 0.3s ease-in-out;
+      }
+
+      .bottom-toolbar {
+        box-shadow: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        transform: translateY(100%);
+        opacity: 0;
+        transition:
+          transform 0.3s ease-in-out,
+          opacity 0.3s ease-in-out;
+      }
+
+      .top-toolbar.show,
+      .bottom-toolbar.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .tool-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 9999px;
+        background: #c3c3c3;
+        border: 1px solid #8a8a8a;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #333333;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+        touch-action: manipulation;
+        position: relative;
+        transform: translateZ(0);
+        will-change: transform;
+      }
+      #app .toolbar .tool-btn img,
+      #app .toolbar .tool-btn svg {
+        width: 50%;
+        height: 50%;
+        min-width: 20px;
+        min-height: 20px;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        display: block;
+        pointer-events: none;
+        filter: brightness(0.7) !important;
+      }
+
+      .toolbar.voice-active .tool-btn:not(#micBtn) {
+        opacity: 0.3;
+        transform: scale(0.95);
+        filter: blur(2px);
+      }
+      .toolbar.voice-active .tool-btn:not(#micBtn) img {
+        filter: brightness(0.7) opacity(0.3) !important;
+      }
+      .tool-btn:active {
+        transform: scale(0.92);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+
+      /* 历史下拉菜单 */
+      .history-dropdown {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(15, 25, 38, 0.9);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        padding: 16px;
+        display: none;
+        z-index: 100;
+        min-width: 200px;
+      }
+      .history-dropdown.show {
+        display: block;
+      }
+      .history-item {
+        padding: 12px 16px;
+        border-radius: 18px;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        margin-bottom: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .history-item:last-child {
+        margin-bottom: 0;
+      }
+      .history-item:active {
+        background: rgba(80, 120, 170, 0.4);
+      }
+
+      /* 历史文件弹窗 */
+      .history-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+      }
+
+      .modal-content {
+        position: relative;
+        width: 80%;
+        max-width: 320px;
+        background: #1a1a1e;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .modal-title {
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .modal-close {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 20px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-body {
+        padding: 16px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .empty-history {
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+        padding: 20px;
+        font-size: 14px;
+      }
+
+      /* 加载提示弹窗 */
+      .loading-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+      }
+
+      .loading-content {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: #1a1a1e;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #5078aa;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 16px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .success-icon,
+      .error-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+      }
+
+      .success-icon {
+        background: #4caf50;
+        color: white;
+      }
+
+      .error-icon {
+        background: #f44336;
+        color: white;
+      }
+
+      .loading-text {
+        color: white;
+        font-size: 16px;
+      }
+
+      /* 设置面板 */
+      .settings-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 400px;
+        background: rgba(15, 25, 38, 0.8);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 20px 18px;
+        z-index: 150;
+        display: none;
+        box-shadow: 0 25px 40px black;
+      }
+      .settings-modal.show {
+        display: block;
+      }
+      .modal-title {
+        color: white;
+        font-size: 18px;
+        margin-bottom: 18px;
+        text-align: center;
+      }
+      .setting-item {
+        margin-bottom: 16px;
+      }
+      .setting-label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .setting-slider {
+        width: 100%;
+        margin: 6px 0;
+      }
+      .setting-number {
+        width: 70px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 20px;
+        padding: 6px 10px;
+        color: white;
+        text-align: center;
+        font-size: 14px;
+        pointer-events: none;
+      }
+      .close-modal-btn {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 36px;
+        text-align: center;
+        color: white;
+        cursor: pointer;
+      }
+
+      /* 语音覆盖层 */
+
+      /* 状态显示 */
+      .status {
+        position: absolute;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        pointer-events: none;
+        z-index: 10;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 顶部工具栏 -->
+      <div class="toolbar top-toolbar" style="width: 100%">
+        <!-- 1.设置按钮 -->
+        <div class="tool-btn" id="settingsBtn">
+          <img
+            src="assets/icon/settings.svg"
+            alt="设置"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 2.打开文件 -->
+        <div class="tool-btn" id="openFileBtn">
+          <img
+            src="assets/icon/open.svg"
+            alt="打开"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 3.设为最佳 -->
+        <div class="tool-btn" id="setBestBtn">
+          <img
+            src="assets/icon/heart-solid.svg"
+            alt="最佳"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 4.历史记录 -->
+        <div class="tool-btn" id="historyBtn" style="position: relative">
+          <img
+            src="assets/icon/history.svg"
+            alt="历史"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+          <div class="history-dropdown" id="historyDropdown"></div>
+        </div>
+        <!-- 5.切换比例 -->
+        <div class="tool-btn" id="toggleScaleBtn">
+          <img
+            src="assets/icon/refresh.svg"
+            alt="切换"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 6.全屏按钮 -->
+        <div class="tool-btn" id="fullscreenBtn">
+          <img
+            src="assets/icon/fullscreen.svg"
+            alt="全屏"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+      </div>
+
+      <!-- 地图框 -->
+      <div class="map-frame" id="mapFrame">
+        <!-- PDF显示区域 -->
+        <div class="pdf-viewer" id="pdfViewer">
+          <canvas id="pdfCanvas" class="pdf-canvas"></canvas>
+        </div>
+        <!-- 地图主体（画布） -->
+        <div class="map-canvas-container">
+          <canvas id="mapCanvas"></canvas>
+          <div id="viewportBox" class="viewport-box"></div>
+        </div>
+        <!-- 左边滚轮 -->
+        <div class="wheel-inline left-wheel" id="leftWheelContainer"></div>
+        <!-- 右边滚轮 -->
+        <div class="wheel-inline right-wheel" id="rightWheelContainer"></div>
+      </div>
+
+      <!-- 底部工具栏 -->
+      <div class="toolbar bottom-toolbar" style="width: 100%">
+        <!-- 语音话筒 -->
+        <div class="tool-btn" id="micBtn">
+          <img
+            src="assets/icon/voice.svg"
+            alt="语音"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+      </div>
+
+      <!-- 语音覆盖层 -->
+
+      <!-- 设置面板 -->
+      <div class="settings-modal" id="settingsModal">
+        <div class="modal-title">滚轮精确度</div>
+        <div class="setting-item">
+          <div class="setting-label">
+            左轮 (大比例调整)
+            <input
+              type="number"
+              id="leftSensInput"
+              step="0.1"
+              min="0.5"
+              max="3.0"
+              value="1.0"
+              class="setting-number"
+              readonly
+            />
+          </div>
+          <input
+            type="range"
+            min="0.5"
+            max="3.0"
+            step="0.1"
+            value="1.0"
+            class="setting-slider"
+            id="leftSensSlider"
+          />
+        </div>
+        <div class="setting-item">
+          <div class="setting-label">
+            右轮 (小比例调整)
+            <input
+              type="number"
+              id="rightSensInput"
+              step="0.05"
+              min="0.1"
+              max="0.5"
+              value="0.2"
+              class="setting-number"
+              readonly
+            />
+          </div>
+          <input
+            type="range"
+            min="0.1"
+            max="0.5"
+            step="0.05"
+            value="0.2"
+            class="setting-slider"
+            id="rightSensSlider"
+          />
+        </div>
+        <div class="close-modal-btn" id="closeSettingsBtn">完成</div>
+      </div>
+
+      <!-- 隐藏文件input -->
+      <input
+        type="file"
+        id="fileInput"
+        accept=".pdf,application/pdf"
+        style="display: none"
+      />
+
+      <!-- 状态显示 -->
+      <div class="status" id="status">连接中...</div>
+    </div>
+
+    <!-- Supabase 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // WebSocket连接
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        // 获取URL参数
+        function getURLParams() {
+          const params = new URLSearchParams(window.location.search);
+          return {
+            session: params.get("session"),
+            date: params.get("date"),
+          };
+        }
+
+        // 初始化WebSocket连接
+        function initWebSocket() {
+          const params = getURLParams();
+          if (!params.session) {
+            document.getElementById("status").textContent = "缺少session参数";
+            return;
+          }
+
+          const wsUrl = `ws://localhost:8000/ws?session=${params.session}&type=controller`;
+          ws = new WebSocket(wsUrl);
+
+          ws.onopen = function () {
+            document.getElementById("status").textContent = "已连接";
+            reconnectAttempts = 0;
+            console.log("WebSocket连接已建立");
+
+            // 连接成功后查询主页面状态
+            sendCommand({ type: "getState" });
+
+            // 发送屏幕尺寸信息
+            sendScreenInfo();
+          };
+
+          ws.onmessage = function (event) {
+            try {
+              const data = JSON.parse(event.data);
+              handleServerMessage(data);
+            } catch (error) {
+              console.error("解析消息失败:", error);
+            }
+          };
+
+          ws.onclose = function () {
+            document.getElementById("status").textContent = "连接已断开";
+            console.log("WebSocket连接已关闭");
+
+            // 尝试重新连接
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              setTimeout(initWebSocket, reconnectAttempts * 2000);
+            }
+          };
+
+          ws.onerror = function (error) {
+            document.getElementById("status").textContent = "连接错误";
+            console.error("WebSocket错误:", error);
+          };
+        }
+
+        // 处理服务器消息
+        function handleServerMessage(message) {
+          switch (message.type) {
+            case "connected":
+              document.getElementById("status").textContent = "已连接到主页面";
+              console.log("已连接到主页面:", message.message);
+              break;
+            case "initScale":
+              state.mapScale = message.scale;
+              state.leftWheelPos = posFromScale(message.scale);
+              state.rightWheelPos = posFromScale(message.scale);
+              drawMap();
+              break;
+            case "zoom":
+              state.mapScale = message.scale;
+              state.leftWheelPos = posFromScale(message.scale);
+              state.rightWheelPos = posFromScale(message.scale);
+              drawMap();
+              break;
+            case "fileOpened":
+              // 主页面打开了文件，切换到PDF视图并请求图片
+              showPDFView();
+              // 发送屏幕尺寸信息，让电脑端发送渲染好的图片
+              sendScreenInfo();
+              break;
+            case "clearFile":
+              // 主页面关闭了文件，手机端返回地图视图
+              hidePDFView();
+              break;
+            case "viewport":
+              // 更新方框视口
+              updateViewportBox(message);
+              break;
+            case "state":
+              // 主页面状态回复
+              if (message.hasFile) {
+                // 主页面有文件打开，切换到PDF视图
+                showPDFView();
+                // 发送屏幕尺寸信息请求图片
+                sendScreenInfo();
+              }
+              break;
+            case "pdfImage":
+              // 接收电脑端发送的PDF图片
+              handlePDFImage(message);
+              break;
+            default:
+              console.log("未知消息类型:", message.type);
+          }
+        }
+
+        // 处理电脑端发送的PDF图片
+        function handlePDFImage(message) {
+          if (!message.imageData) return;
+
+          console.log("接收PDF图片，数据大小:", message.imageData.length);
+
+          // 切换到PDF视图
+          showPDFView();
+
+          // 根据方向缓存图片
+          const orientation = message.orientation || getCurrentOrientation();
+          imageCache[orientation] = message.imageData;
+          imageCache.lastInfo = {
+            pageWidth: message.pageWidth,
+            pageHeight: message.pageHeight,
+            phoneWidth: message.phoneWidth,
+            phoneHeight: message.phoneHeight,
+            renderScale: message.renderScale,
+          };
+
+          // 显示图片
+          displayPDFImage(message.imageData, message);
+        }
+
+        // 显示PDF图片
+        function displayPDFImage(imageData, info) {
+          console.log("开始显示PDF图片 - 图片数据长度:", imageData.length);
+          console.log("图片信息:", info);
+
+          // 获取DOM元素
+          const mapFrame = document.getElementById("mapFrame");
+          const pdfCanvas = document.getElementById("pdfCanvas");
+          const pdfCtx = pdfCanvas ? pdfCanvas.getContext("2d") : null;
+
+          if (!mapFrame || !pdfCanvas || !pdfCtx) {
+            console.error("DOM元素获取失败");
+            return;
+          }
+
+          const img = new Image();
+          img.onload = function () {
+            console.log("图片加载成功 - 图片尺寸:", img.width, "x", img.height);
+
+            // 获取容器尺寸
+            const rect = mapFrame.getBoundingClientRect();
+            const containerWidth = rect.width || 300;
+            const containerHeight = rect.height || 400;
+
+            console.log("容器尺寸:", containerWidth, "x", containerHeight);
+
+            // 检查phoneWidth和phoneHeight
+            if (!info.phoneWidth || !info.phoneHeight) {
+              console.error("phoneWidth或phoneHeight为空，使用图片原始尺寸");
+              info.phoneWidth = img.width;
+              info.phoneHeight = img.height;
+            }
+
+            // 设置canvas尺寸
+            const dpr = window.devicePixelRatio || 1;
+            pdfCanvas.width = containerWidth * dpr;
+            pdfCanvas.height = containerHeight * dpr;
+            pdfCtx.scale(dpr, dpr);
+
+            // 清空画布（黑色背景用于屏幕外区域）
+            pdfCtx.fillStyle = "#000000";
+            pdfCtx.fillRect(0, 0, containerWidth, containerHeight);
+
+            // 计算显示尺寸（确保图片完全显示）
+            const scaleX = containerWidth / info.phoneWidth;
+            const scaleY = containerHeight / info.phoneHeight;
+            const displayScale = Math.min(scaleX, scaleY);
+            const displayWidth = info.phoneWidth * displayScale;
+            const displayHeight = info.phoneHeight * displayScale;
+            const offsetX = (containerWidth - displayWidth) / 2;
+            const offsetY = (containerHeight - displayHeight) / 2;
+
+            console.log(
+              "显示计算 - scaleX:",
+              scaleX,
+              "scaleY:",
+              scaleY,
+              "displayScale:",
+              displayScale,
+            );
+            console.log(
+              "显示位置 - offsetX:",
+              offsetX,
+              "offsetY:",
+              offsetY,
+              "宽:",
+              displayWidth,
+              "高:",
+              displayHeight,
+            );
+
+            // 绘制阴影背景（在图片下方）
+            pdfCtx.fillStyle = "rgba(0, 0, 0, 0.25)";
+            pdfCtx.shadowColor = "rgba(0, 0, 0, 0.5)";
+            pdfCtx.shadowBlur = 15;
+            pdfCtx.shadowOffsetX = 5;
+            pdfCtx.shadowOffsetY = 5;
+            pdfCtx.fillRect(
+              offsetX + 3,
+              offsetY + 3,
+              displayWidth,
+              displayHeight,
+            );
+
+            // 重置阴影设置用于绘制图片
+            pdfCtx.shadowColor = "transparent";
+            pdfCtx.shadowBlur = 0;
+            pdfCtx.shadowOffsetX = 0;
+            pdfCtx.shadowOffsetY = 0;
+
+            // 绘制图片（居中显示，在阴影上方）
+            pdfCtx.drawImage(
+              img,
+              offsetX,
+              offsetY,
+              displayWidth,
+              displayHeight,
+            );
+
+            // 更新视口方框（方框大小和图片一样）
+            updateViewportBoxForImage(
+              offsetX,
+              offsetY,
+              displayWidth,
+              displayHeight,
+            );
+
+            console.log("PDF图片显示完成");
+          };
+          img.onerror = function (error) {
+            console.error("图片加载失败:", error);
+            // 显示错误提示
+            const rect = mapFrame.getBoundingClientRect();
+            pdfCanvas.width = rect.width || 300;
+            pdfCanvas.height = rect.height || 400;
+            pdfCtx.fillStyle = "#333";
+            pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+            pdfCtx.fillStyle = "#fff";
+            pdfCtx.font = "16px Arial";
+            pdfCtx.textAlign = "center";
+            pdfCtx.fillText(
+              "图片加载失败",
+              pdfCanvas.width / 2,
+              pdfCanvas.height / 2,
+            );
+          };
+          img.src = imageData;
+        }
+
+        // 更新视口方框（用于图片显示，方框大小和图片一样）
+        function updateViewportBoxForImage(left, top, width, height) {
+          const viewportBox = document.getElementById("viewportBox");
+          if (!viewportBox) return;
+
+          // 设置方框位置和大小（与图片一致）
+          viewportBox.style.left = `${left}px`;
+          viewportBox.style.top = `${top}px`;
+          viewportBox.style.width = `${width}px`;
+          viewportBox.style.height = `${height}px`;
+          viewportBox.style.transform = "none";
+
+          console.log(
+            "视口方框已更新 - 位置:",
+            left,
+            top,
+            "大小:",
+            width,
+            "x",
+            height,
+          );
+        }
+
+        // 更新方框视口
+        function updateViewportBox(data) {
+          const viewportBox = document.getElementById("viewportBox");
+          if (!viewportBox) return;
+
+          const { left, top, width, height, pageWidth, pageHeight } = data;
+
+          // 获取地图容器尺寸
+          const mapContainer = document.querySelector(".map-canvas-container");
+          if (!mapContainer) return;
+
+          const containerRect = mapContainer.getBoundingClientRect();
+          const containerWidth = containerRect.width;
+          const containerHeight = containerRect.height;
+
+          // 计算PDF在地图中的缩放比例（适应容器）
+          const scaleX = containerWidth / pageWidth;
+          const scaleY = containerHeight / pageHeight;
+          const displayScale = Math.min(scaleX, scaleY);
+
+          // 计算PDF在容器中的实际位置（居中显示）
+          const pdfDisplayWidth = pageWidth * displayScale;
+          const pdfDisplayHeight = pageHeight * displayScale;
+          const pdfOffsetX = (containerWidth - pdfDisplayWidth) / 2;
+          const pdfOffsetY = (containerHeight - pdfDisplayHeight) / 2;
+
+          // 计算视口方框大小（保持主页面宽高比）
+          const boxWidth = width * displayScale;
+          const boxHeight = height * displayScale;
+
+          // 计算方框位置：视口左上角在PDF中的位置 * 缩放比例 + PDF在容器中的偏移
+          // left和top是视口左上角相对于PDF页面左上角的位置
+          const boxLeft = pdfOffsetX + left * displayScale;
+          const boxTop = pdfOffsetY + top * displayScale;
+
+          console.log("视口方框更新 - 输入数据:", data);
+          console.log(
+            "视口方框更新 - 容器尺寸:",
+            containerWidth,
+            containerHeight,
+          );
+          console.log("视口方框更新 - 显示缩放:", displayScale);
+          console.log("视口方框更新 - PDF偏移:", pdfOffsetX, pdfOffsetY);
+          console.log(
+            "视口方框更新 - 方框位置:",
+            boxLeft,
+            boxTop,
+            "大小:",
+            boxWidth,
+            boxHeight,
+          );
+
+          // 设置方框位置和大小（左上角定位）
+          viewportBox.style.left = `${boxLeft}px`;
+          viewportBox.style.top = `${boxTop}px`;
+          viewportBox.style.transform = "none";
+          viewportBox.style.width = `${boxWidth}px`;
+          viewportBox.style.height = `${boxHeight}px`;
+        }
+
+        // 图片缓存（横屏和竖屏）
+        const imageCache = {
+          landscape: null,
+          portrait: null,
+          lastInfo: null,
+        };
+
+        // 获取当前方向
+        function getCurrentOrientation() {
+          return window.innerWidth > window.innerHeight
+            ? "landscape"
+            : "portrait";
+        }
+
+        // 发送屏幕尺寸信息
+        function sendScreenInfo() {
+          const mapFrame = document.getElementById("mapFrame");
+          if (!mapFrame) {
+            console.error("mapFrame元素不存在");
+            return;
+          }
+          const rect = mapFrame.getBoundingClientRect();
+          const orientation = getCurrentOrientation();
+          console.log(
+            "发送屏幕尺寸信息 - 尺寸:",
+            rect.width,
+            "x",
+            rect.height,
+            "方向:",
+            orientation,
+          );
+          sendCommand({
+            type: "screenInfo",
+            width: rect.width,
+            height: rect.height,
+            orientation: orientation,
+          });
+        }
+
+        // 监听屏幕方向变化
+        window.addEventListener("orientationchange", function () {
+          setTimeout(function () {
+            sendScreenInfo();
+          }, 300);
+        });
+
+        // 发送控制命令
+        function sendCommand(command) {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(command));
+            console.log("发送命令:", command);
+          } else {
+            console.error("WebSocket未连接");
+          }
+        }
+
+        // 页面加载时初始化WebSocket
+        document.addEventListener("DOMContentLoaded", function () {
+          initWebSocket();
+        });
+
+        // Supabase 配置
+        const SUPABASE_URL = "https://zwnluqynchoidpiittdp.supabase.co";
+        const SUPABASE_ANON_KEY =
+          "sb_publishable_bmgWwgQxTGMf0r8tyqyTHg__3g7osn1";
+        const supabaseClient = supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY,
+        );
+
+        // 状态
+        const state = {
+          mapScale: 1.0,
+          leftSens: 1.0,
+          rightSens: 0.2,
+          offsetX: 0,
+          offsetY: 0,
+          leftWheelPos: 0.125, // 1.0 / 8.0
+          rightWheelPos: 0.125,
+          bestView: { scale: 1.0, offsetX: 0, offsetY: 0 },
+          historyList: [],
+        };
+
+        // DOM
+        const canvas = document.getElementById("mapCanvas");
+        const ctx = canvas.getContext("2d");
+        const leftContainer = document.getElementById("leftWheelContainer");
+        const rightContainer = document.getElementById("rightWheelContainer");
+        const settingsModal = document.getElementById("settingsModal");
+        const settingsBtn = document.getElementById("settingsBtn");
+        const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+        const fullscreenBtn = document.getElementById("fullscreenBtn");
+        const leftSensSlider = document.getElementById("leftSensSlider");
+        const leftSensInput = document.getElementById("leftSensInput");
+        const rightSensSlider = document.getElementById("rightSensSlider");
+        const rightSensInput = document.getElementById("rightSensInput");
+        const openFileBtn = document.getElementById("openFileBtn");
+        const fileInput = document.getElementById("fileInput");
+        const historyBtn = document.getElementById("historyBtn");
+        const historyDropdown = document.getElementById("historyDropdown");
+        const setBestBtn = document.getElementById("setBestBtn");
+        const toggleScaleBtn = document.getElementById("toggleScaleBtn");
+        const micBtn = document.getElementById("micBtn");
+        const voiceOverlay = document.getElementById("voiceOverlay");
+        const exitVoiceBtn = document.getElementById("exitVoiceBtn");
+        const voiceRecordBtn = document.getElementById("voiceRecordBtn");
+        const recordHint = document.getElementById("recordHint");
+
+        // PDF相关DOM
+        const mapFrame = document.getElementById("mapFrame");
+        const pdfViewer = document.getElementById("pdfViewer");
+        const pdfCanvas = document.getElementById("pdfCanvas");
+        const pdfCtx = pdfCanvas.getContext("2d");
+
+        // 常量
+        const MIN_SCALE = 0.1;
+        const MAX_SCALE = 20.0;
+        const vibrateSupported = "vibrate" in navigator;
+
+        // 滚轮交互
+        let activeWheel = null,
+          wheelStartY = 0,
+          wheelStartPos = 0.5;
+        // 节流控制
+        let lastZoomTime = 0;
+        const zoomThrottleDelay = 100;
+        // 地图拖拽
+        let isDragging = false,
+          dragStart = { x: 0, y: 0 },
+          lastOffset = { x: 0, y: 0 },
+          dragTouchId = null;
+        let initDist = 0,
+          initScale = 1.0;
+
+        // 辅助函数
+        function scaleFromPos(pos) {
+          const scale = MIN_SCALE + pos * (MAX_SCALE - MIN_SCALE);
+          return Math.round(scale * 50) / 50; // 精度为1/50
+        }
+        function posFromScale(scale) {
+          return Math.min(
+            1,
+            Math.max(0, (scale - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)),
+          );
+        }
+
+        // 初始化尺寸
+        function resizeCanvas() {
+          const container = canvas.parentElement;
+          const rect = container.getBoundingClientRect();
+          const dpr = window.devicePixelRatio || 1;
+
+          // 提高Canvas分辨率，避免放大后模糊
+          canvas.width = (rect.width || 300) * dpr;
+          canvas.height = (rect.height || 200) * dpr;
+
+          // 调整Canvas的显示大小
+          canvas.style.width = `${rect.width || 300}px`;
+          canvas.style.height = `${rect.height || 200}px`;
+
+          // 调整绘图上下文的缩放比例
+          ctx.scale(dpr, dpr);
+
+          drawMap();
+        }
+        window.addEventListener("resize", resizeCanvas);
+
+        // PDF显示相关函数
+        let pdfDoc = null;
+        // PDF缓存：key为文件URL，value为PDF文档对象和渲染的canvas
+        const pdfCache = new Map();
+
+        // 显示PDF视图，隐藏地图
+        function showPDFView() {
+          pdfViewer.classList.add("active");
+        }
+
+        // 隐藏PDF视图，显示地图
+        function hidePDFView() {
+          pdfViewer.classList.remove("active");
+        }
+
+        // 加载并显示PDF文件
+        async function loadAndDisplayPDF(
+          fileUrl,
+          masterScale = null,
+          masterOffsetX = 0,
+          masterOffsetY = 0,
+          masterPageWidth = 0,
+          masterPageHeight = 0,
+        ) {
+          try {
+            console.log("开始加载PDF:", fileUrl);
+
+            // 使用PDF.js加载PDF（直接使用全局变量pdfjsLib）
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+              "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+            const loadingTask = pdfjsLib.getDocument({
+              url: fileUrl,
+              cMapUrl:
+                "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
+              cMapPacked: true,
+            });
+            pdfDoc = await loadingTask.promise;
+
+            console.log("PDF加载成功，页数:", pdfDoc.numPages);
+
+            // 获取第一页
+            const page = await pdfDoc.getPage(1);
+
+            // 获取页面尺寸
+            const viewport = page.getViewport({ scale: 1 });
+            const pageWidth = viewport.width;
+            const pageHeight = viewport.height;
+
+            console.log("PDF页面尺寸:", pageWidth, "x", pageHeight);
+
+            // 获取容器尺寸
+            const rect = mapFrame.getBoundingClientRect();
+            const containerWidth = rect.width;
+            const containerHeight = rect.height;
+
+            console.log("容器尺寸:", containerWidth, "x", containerHeight);
+
+            // 设置canvas尺寸
+            const dpr = window.devicePixelRatio || 1;
+            pdfCanvas.width = containerWidth * dpr;
+            pdfCanvas.height = containerHeight * dpr;
+            pdfCtx.scale(dpr, dpr);
+
+            // 清空画布（黑色背景，用于屏幕外内容）
+            pdfCtx.fillStyle = "#000000";
+            pdfCtx.fillRect(0, 0, containerWidth, containerHeight);
+
+            // 计算渲染参数
+            let renderScale;
+            let renderOffsetX = 0;
+            let renderOffsetY = 0;
+
+            if (
+              masterScale !== null &&
+              masterOffsetX !== undefined &&
+              masterOffsetY !== undefined
+            ) {
+              // 使用电脑端的缩放比例（保持一致）
+              renderScale = masterScale;
+
+              // 电脑端视口左上角在PDF页面上的位置（相对于PDF左上角）
+              const viewportLeft = -masterOffsetX / masterScale;
+              const viewportTop = -masterOffsetY / masterScale;
+
+              // PDF渲染后的尺寸
+              const renderedWidth = pageWidth * renderScale;
+              const renderedHeight = pageHeight * renderScale;
+
+              // 计算渲染偏移：让电脑端视口区域居中显示在手机端容器中
+              // 电脑端视口中心 = (viewportLeft + viewportWidth/2, viewportTop + viewportHeight/2)
+              // 手机端容器中心应该显示这个点
+              const viewportCenterX =
+                viewportLeft + containerWidth / masterScale / 2;
+              const viewportCenterY =
+                viewportTop + containerHeight / masterScale / 2;
+
+              // 渲染偏移 = 容器中心 - 视口中心 * 渲染比例
+              renderOffsetX =
+                containerWidth / 2 - viewportCenterX * renderScale;
+              renderOffsetY =
+                containerHeight / 2 - viewportCenterY * renderScale;
+
+              console.log(
+                "使用电脑端状态 - 缩放:",
+                renderScale,
+                "视口位置:",
+                viewportLeft,
+                viewportTop,
+                "渲染偏移:",
+                renderOffsetX,
+                renderOffsetY,
+              );
+            } else {
+              // 计算适应容器的缩放比例（全内容显示）
+              const scaleX = containerWidth / pageWidth;
+              const scaleY = containerHeight / pageHeight;
+              renderScale = Math.min(scaleX, scaleY);
+
+              // 居中显示
+              const renderedWidth = pageWidth * renderScale;
+              const renderedHeight = pageHeight * renderScale;
+              renderOffsetX = (containerWidth - renderedWidth) / 2;
+              renderOffsetY = (containerHeight - renderedHeight) / 2;
+
+              console.log(
+                "适应容器显示 - 缩放:",
+                renderScale,
+                "偏移:",
+                renderOffsetX,
+                renderOffsetY,
+              );
+            }
+
+            // 渲染PDF页面（使用计算的缩放比例）
+            const renderViewport = page.getViewport({ scale: renderScale });
+            const renderContext = {
+              canvasContext: pdfCtx,
+              viewport: renderViewport,
+              enableWebGL: true,
+            };
+
+            console.log("渲染偏移:", renderOffsetX, renderOffsetY);
+
+            // 平移到渲染位置
+            pdfCtx.save();
+            pdfCtx.translate(renderOffsetX, renderOffsetY);
+
+            await page.render(renderContext).promise;
+
+            pdfCtx.restore();
+
+            // 缓存PDF数据
+            const cachedData = {
+              pdfDoc: pdfDoc,
+              imageData: pdfCanvas.toDataURL("image/webp", 0.9),
+              pageWidth: pageWidth,
+              pageHeight: pageHeight,
+              displayScale: renderScale,
+              containerWidth: containerWidth,
+              containerHeight: containerHeight,
+            };
+            pdfCache.set(fileUrl, cachedData);
+
+            // 显示PDF视图
+            showPDFView();
+
+            console.log("PDF加载成功，已缓存");
+          } catch (error) {
+            console.error("PDF加载失败:", error);
+          }
+        }
+
+        // 渲染缓存的PDF
+        function renderCachedPDF(fileUrl) {
+          const cachedData = pdfCache.get(fileUrl);
+          if (!cachedData) return;
+
+          // 获取容器尺寸
+          const rect = mapFrame.getBoundingClientRect();
+          const containerWidth = rect.width;
+          const containerHeight = rect.height;
+
+          // 设置canvas尺寸
+          const dpr = window.devicePixelRatio || 1;
+          pdfCanvas.width = containerWidth * dpr;
+          pdfCanvas.height = containerHeight * dpr;
+          pdfCtx.scale(dpr, dpr);
+
+          // 创建img元素加载缓存的图片
+          const img = new Image();
+          img.onload = function () {
+            // 清空画布（白色背景）
+            pdfCtx.fillStyle = "#ffffff";
+            pdfCtx.fillRect(0, 0, containerWidth, containerHeight);
+
+            // 计算缩放和居中
+            const scaleX = containerWidth / cachedData.pageWidth;
+            const scaleY = containerHeight / cachedData.pageHeight;
+            const displayScale = Math.min(scaleX, scaleY);
+            const scaledWidth = cachedData.pageWidth * displayScale;
+            const scaledHeight = cachedData.pageHeight * displayScale;
+            const offsetX = (containerWidth - scaledWidth) / 2;
+            const offsetY = (containerHeight - scaledHeight) / 2;
+
+            // 绘制图片
+            pdfCtx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+          };
+          img.src = cachedData.imageData;
+        }
+
+        function setMapScale(newScale, source) {
+          newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
+          if (Math.abs(newScale - state.mapScale) < 0.001) return;
+          state.mapScale = newScale;
+          if (source !== "left") state.leftWheelPos = posFromScale(newScale);
+          if (source !== "right") state.rightWheelPos = posFromScale(newScale);
+          drawMap();
+
+          // 发送缩放命令到主页面
+          sendCommand({ type: "zoom", scale: newScale });
+        }
+
+        function drawMap() {
+          // 不绘制网格，只清空画布
+          if (!ctx) return;
+          const w = canvas.width,
+            h = canvas.height;
+          ctx.clearRect(0, 0, w, h);
+        }
+
+        function animate() {
+          drawMap();
+          requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+
+        // 触摸事件
+        function handleMapDragStart(e) {
+          e.preventDefault();
+          const touch = e.touches[0];
+          if (e.touches.length === 1 && !activeWheel) {
+            isDragging = true;
+            dragTouchId = touch.identifier;
+            dragStart.x = touch.clientX;
+            dragStart.y = touch.clientY;
+            lastOffset.x = state.offsetX;
+            lastOffset.y = state.offsetY;
+          }
+        }
+        function handleMapDragMove(e) {
+          if (!isDragging) return;
+          e.preventDefault();
+          let touch = null;
+          for (let i = 0; i < e.touches.length; i++)
+            if (e.touches[i].identifier === dragTouchId) {
+              touch = e.touches[i];
+              break;
+            }
+          if (!touch) return;
+          const dx = touch.clientX - dragStart.x,
+            dy = touch.clientY - dragStart.y;
+          state.offsetX = lastOffset.x - dx / state.mapScale;
+          state.offsetY = lastOffset.y - dy / state.mapScale;
+          drawMap();
+
+          // 发送拖拽命令到主页面（使用 pan 类型与主页面一致）
+          sendCommand({
+            type: "pan",
+            offsetX: state.offsetX,
+            offsetY: state.offsetY,
+          });
+        }
+        function handleMapDragEnd(e) {
+          e.preventDefault();
+          isDragging = false;
+          dragTouchId = null;
+        }
+        function handlePinchStart(e) {
+          if (e.touches.length === 2) {
+            e.preventDefault();
+            const t1 = e.touches[0],
+              t2 = e.touches[1];
+            initDist = Math.hypot(
+              t1.clientX - t2.clientX,
+              t1.clientY - t2.clientY,
+            );
+            initScale = state.mapScale;
+          }
+        }
+        function handlePinchMove(e) {
+          if (e.touches.length === 2) {
+            e.preventDefault();
+            const t1 = e.touches[0],
+              t2 = e.touches[1];
+            const dist = Math.hypot(
+              t1.clientX - t2.clientX,
+              t1.clientY - t2.clientY,
+            );
+            if (initDist > 0)
+              setMapScale(initScale * (dist / initDist), "pinch");
+          }
+        }
+        canvas.addEventListener(
+          "touchstart",
+          (e) => {
+            if (e.touches.length === 1) handleMapDragStart(e);
+            else if (e.touches.length === 2) handlePinchStart(e);
+          },
+          { passive: false },
+        );
+        canvas.addEventListener(
+          "touchmove",
+          (e) => {
+            if (e.touches.length === 1) handleMapDragMove(e);
+            else if (e.touches.length === 2) handlePinchMove(e);
+          },
+          { passive: false },
+        );
+        canvas.addEventListener("touchend", handleMapDragEnd);
+        canvas.addEventListener("touchcancel", handleMapDragEnd);
+
+        // 双击事件处理 - 控制主页面坐标系切换
+        let lastTap = 0;
+        canvas.addEventListener("touchstart", (e) => {
+          const now = Date.now();
+          const DOUBLE_TAP_DELAY = 300;
+          if (now - lastTap < DOUBLE_TAP_DELAY) {
+            // 双击事件 - 发送命令到主页面切换坐标系
+            e.preventDefault();
+            sendCommand({ type: "toggleGrid" });
+          }
+          lastTap = now;
+        });
+
+        // 滚轮交互
+        function wheelStart(e, side) {
+          e.preventDefault();
+          const touch = e.touches[0];
+          activeWheel = side;
+          wheelStartY = touch.clientY;
+          wheelStartPos =
+            side === "left" ? state.leftWheelPos : state.rightWheelPos;
+        }
+        function wheelMove(e, side) {
+          e.preventDefault();
+          if (activeWheel !== side) return;
+          const touch = e.touches[0];
+          const deltaY = wheelStartY - touch.clientY;
+          const container = side === "left" ? leftContainer : rightContainer;
+          const h = container.clientHeight;
+          if (h <= 0) return;
+          const sens = side === "left" ? state.leftSens : state.rightSens;
+          const deltaPos = (deltaY / (h * 1.5)) * sens;
+          let newPos = Math.min(1, Math.max(0, wheelStartPos + deltaPos));
+          if (side === "left") state.leftWheelPos = newPos;
+          else state.rightWheelPos = newPos;
+
+          const newScale = scaleFromPos(newPos);
+          if (Math.abs(newScale - state.mapScale) > 0.001) {
+            state.mapScale = newScale;
+            if (side === "left") state.rightWheelPos = posFromScale(newScale);
+            else state.leftWheelPos = posFromScale(newScale);
+
+            drawMap();
+
+            // 节流控制：限制发送缩放命令的频率
+            const now = Date.now();
+            if (now - lastZoomTime > zoomThrottleDelay) {
+              lastZoomTime = now;
+              // 发送缩放命令到主页面
+              sendCommand({ type: "zoom", scale: newScale });
+              // 发送 refresh 命令触发重新渲染
+              sendCommand({ type: "refresh" });
+            }
+          }
+          if (vibrateSupported && Math.abs(deltaY) > 2) navigator.vibrate(3);
+        }
+        function wheelEnd(e) {
+          e.preventDefault();
+          activeWheel = null;
+        }
+        leftContainer.addEventListener(
+          "touchstart",
+          (e) => wheelStart(e, "left"),
+          { passive: false },
+        );
+        leftContainer.addEventListener(
+          "touchmove",
+          (e) => wheelMove(e, "left"),
+          { passive: false },
+        );
+        leftContainer.addEventListener("touchend", wheelEnd);
+        rightContainer.addEventListener(
+          "touchstart",
+          (e) => wheelStart(e, "right"),
+          { passive: false },
+        );
+        rightContainer.addEventListener(
+          "touchmove",
+          (e) => wheelMove(e, "right"),
+          { passive: false },
+        );
+        rightContainer.addEventListener("touchend", wheelEnd);
+
+        // 鼠标事件处理（电脑端）
+        function mouseWheelStart(e, side) {
+          e.preventDefault();
+          activeWheel = side;
+          wheelStartY = e.clientY;
+          wheelStartPos =
+            side === "left" ? state.leftWheelPos : state.rightWheelPos;
+        }
+
+        function mouseWheelMove(e, side) {
+          e.preventDefault();
+          if (activeWheel !== side) return;
+          const deltaY = wheelStartY - e.clientY;
+          const container = side === "left" ? leftContainer : rightContainer;
+          const h = container.clientHeight;
+          if (h <= 0) return;
+          const sens = side === "left" ? state.leftSens : state.rightSens;
+          const deltaPos = (deltaY / (h * 1.5)) * sens;
+          let newPos = Math.min(1, Math.max(0, wheelStartPos + deltaPos));
+          if (side === "left") state.leftWheelPos = newPos;
+          else state.rightWheelPos = newPos;
+
+          const newScale = scaleFromPos(newPos);
+          if (Math.abs(newScale - state.mapScale) > 0.001) {
+            state.mapScale = newScale;
+            if (side === "left") state.rightWheelPos = posFromScale(newScale);
+            else state.leftWheelPos = posFromScale(newScale);
+
+            drawMap();
+
+            // 节流控制：限制发送缩放命令的频率
+            const now = Date.now();
+            if (now - lastZoomTime > zoomThrottleDelay) {
+              lastZoomTime = now;
+              // 发送缩放命令到主页面
+              sendCommand({ type: "zoom", scale: newScale });
+              // 发送 refresh 命令触发重新渲染
+              sendCommand({ type: "refresh" });
+            }
+          }
+        }
+
+        function mouseWheelEnd(e) {
+          e.preventDefault();
+          activeWheel = null;
+        }
+
+        // 为滚轮容器添加鼠标事件监听器
+        leftContainer.addEventListener("mousedown", (e) =>
+          mouseWheelStart(e, "left"),
+        );
+        leftContainer.addEventListener("mousemove", (e) =>
+          mouseWheelMove(e, "left"),
+        );
+        leftContainer.addEventListener("mouseup", mouseWheelEnd);
+        leftContainer.addEventListener("mouseleave", mouseWheelEnd);
+
+        rightContainer.addEventListener("mousedown", (e) =>
+          mouseWheelStart(e, "right"),
+        );
+        rightContainer.addEventListener("mousemove", (e) =>
+          mouseWheelMove(e, "right"),
+        );
+        rightContainer.addEventListener("mouseup", mouseWheelEnd);
+        rightContainer.addEventListener("mouseleave", mouseWheelEnd);
+
+        // 底部按钮功能
+        openFileBtn.addEventListener("click", () => {
+          // 触发手机端文件选择器
+          fileInput.click();
+        });
+
+        // 文件选择事件处理
+        fileInput.addEventListener("change", async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          // 显示加载提示
+          const loadingModal = document.createElement("div");
+          loadingModal.className = "loading-modal";
+          loadingModal.innerHTML = `
+            <div class="loading-overlay"></div>
+            <div class="loading-content">
+              <div class="loading-spinner"></div>
+              <span class="loading-text">上传中...</span>
+            </div>
+          `;
+          document.body.appendChild(loadingModal);
+
+          try {
+            // 上传文件到 Supabase（使用与主网页相同的逻辑）
+            const fileName = file.name;
+            const ext = fileName.split(".").pop();
+            // 使用随机生成的文件名，避免中文等特殊字符问题
+            const storageName = `${Date.now()}_${Math.random().toString(36).substr(2)}.${ext}`;
+
+            const { error: uploadError } = await supabaseClient.storage
+              .from("PDFs")
+              .upload(storageName, file);
+
+            if (uploadError) {
+              throw uploadError;
+            }
+
+            // 插入历史记录到数据库
+            const { error: insertErr } = await supabaseClient
+              .from("pdf_history")
+              .insert([
+                {
+                  file_name: fileName,
+                  storage_path: storageName,
+                  size: file.size,
+                },
+              ]);
+
+            if (insertErr) {
+              throw insertErr;
+            }
+
+            // 获取文件的公开访问URL
+            // 使用签名URL代替public URL
+            const { data: signedUrlData, error: signedUrlError } =
+              await supabaseClient.storage
+                .from("PDFs")
+                .createSignedUrl(storageName, 60 * 60); // 1小时有效期
+
+            if (signedUrlError) {
+              throw signedUrlError;
+            }
+
+            const fileUrl = signedUrlData.signedUrl;
+
+            // 上传成功后，发送命令到网页端打开文件
+            sendCommand({
+              type: "loadFile",
+              storagePath: storageName,
+              fileName: fileName,
+              url: fileUrl,
+            });
+
+            // 加载并显示PDF到手机端
+            await loadAndDisplayPDF(fileUrl);
+
+            // 显示上传成功提示
+            loadingModal.innerHTML = `
+              <div class="loading-overlay"></div>
+              <div class="loading-content">
+                <div class="success-icon">✓</div>
+                <span class="loading-text">上传成功</span>
+              </div>
+            `;
+
+            // 3秒后关闭提示
+            setTimeout(() => {
+              loadingModal.remove();
+            }, 2000);
+          } catch (error) {
+            console.error("文件上传失败:", error);
+            loadingModal.innerHTML = `
+              <div class="loading-overlay"></div>
+              <div class="loading-content">
+                <div class="error-icon">✗</div>
+                <span class="loading-text">上传失败</span>
+              </div>
+            `;
+            setTimeout(() => {
+              loadingModal.remove();
+            }, 2000);
+          }
+
+          // 重置文件输入
+          fileInput.value = "";
+        });
+
+        // 从API获取历史文件列表
+        async function fetchHistoryList() {
+          try {
+            const response = await fetch("/api/history");
+            const data = await response.json();
+            state.historyList = data;
+            console.log("获取历史文件:", data);
+            return data;
+          } catch (error) {
+            console.error("获取历史失败:", error);
+            return [];
+          }
+        }
+
+        // 显示历史文件选择弹窗
+        function showHistoryModal() {
+          // 创建弹窗
+          const modal = document.createElement("div");
+          modal.className = "history-modal";
+          modal.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+              <div class="modal-header">
+                <span class="modal-title">历史文件</span>
+                <button class="modal-close">×</button>
+              </div>
+              <div class="modal-body" id="historyListContainer"></div>
+            </div>
+          `;
+          document.body.appendChild(modal);
+
+          // 绑定关闭事件
+          const overlay = modal.querySelector(".modal-overlay");
+          const closeBtn = modal.querySelector(".modal-close");
+          overlay.addEventListener("click", () => modal.remove());
+          closeBtn.addEventListener("click", () => modal.remove());
+
+          // 加载并显示历史文件
+          fetchHistoryList().then((history) => {
+            const container = document.getElementById("historyListContainer");
+            if (history.length === 0) {
+              container.innerHTML =
+                "<div class='empty-history'>暂无历史文件</div>";
+            } else {
+              // 使用事件委托绑定点击事件
+              history.forEach((item) => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "history-item";
+                itemDiv.textContent = item.file_name;
+                itemDiv.addEventListener("click", () => {
+                  // 发送加载文件命令到主页面
+                  sendCommand({
+                    type: "loadHistoryFile",
+                    storagePath: item.storage_path,
+                    fileName: item.file_name,
+                  });
+                  // 关闭弹窗
+                  modal.remove();
+                });
+                container.appendChild(itemDiv);
+              });
+            }
+          });
+        }
+
+        historyBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // 在手机端显示历史文件选择弹窗
+          showHistoryModal();
+        });
+
+        // 最佳比例按钮逻辑
+        let bestScaleLongPressTimer = null;
+        let bestScaleLongPressed = false; // 标记是否触发了长按
+        const BEST_SCALE_LONG_PRESS_DURATION = 500;
+
+        // 双击检测变量（触摸设备）
+        let touchStartTime = 0;
+        let touchCount = 0;
+        const DOUBLE_TAP_THRESHOLD = 300; // 双击时间阈值
+
+        // 单击：不发送命令（电脑端单击也没有改变比例的事件）
+        setBestBtn.addEventListener("click", () => {
+          // 如果已经触发了长按，忽略单击事件
+          if (bestScaleLongPressed) {
+            bestScaleLongPressed = false;
+            return;
+          }
+          // 单击不发送任何命令（电脑端单击无实际操作）
+        });
+
+        // 双击保存最佳比例（桌面端）
+        setBestBtn.addEventListener("dblclick", () => {
+          // 发送保存最佳比例命令到主页面
+          sendCommand({ type: "saveBestScale" });
+        });
+
+        // 长按重置最佳比例（桌面设备）
+        setBestBtn.addEventListener("mousedown", () => {
+          // 清除之前的定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+          }
+          bestScaleLongPressed = false;
+          // 设置新的定时器
+          bestScaleLongPressTimer = setTimeout(() => {
+            bestScaleLongPressed = true; // 标记已触发长按
+            // 发送重置最佳比例命令到主页面
+            sendCommand({ type: "resetBestScale" });
+          }, BEST_SCALE_LONG_PRESS_DURATION);
+        });
+
+        setBestBtn.addEventListener("mouseup", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        setBestBtn.addEventListener("mouseleave", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        // 触摸设备：同时处理双击和长按
+        setBestBtn.addEventListener("touchstart", () => {
+          const now = Date.now();
+
+          // 双击检测
+          if (now - touchStartTime < DOUBLE_TAP_THRESHOLD) {
+            touchCount++;
+            if (touchCount >= 2) {
+              // 发送保存最佳比例命令到主页面
+              sendCommand({ type: "saveBestScale" });
+              touchCount = 0;
+              // 清除长按定时器
+              if (bestScaleLongPressTimer) {
+                clearTimeout(bestScaleLongPressTimer);
+                bestScaleLongPressTimer = null;
+              }
+              return; // 双击时不启动长按定时器
+            }
+          } else {
+            touchCount = 1;
+          }
+          touchStartTime = now;
+
+          // 长按检测
+          // 清除之前的定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+          }
+          bestScaleLongPressed = false;
+          // 设置新的定时器
+          bestScaleLongPressTimer = setTimeout(() => {
+            bestScaleLongPressed = true; // 标记已触发长按
+            touchCount = 0; // 重置双击计数
+            // 发送重置最佳比例命令到主页面
+            sendCommand({ type: "resetBestScale" });
+          }, BEST_SCALE_LONG_PRESS_DURATION);
+        });
+
+        setBestBtn.addEventListener("touchend", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        toggleScaleBtn.addEventListener("click", () => {
+          // 发送切换视图命令到主页面
+          sendCommand({ type: "toggleView" });
+        });
+
+        // 全屏按钮功能
+        fullscreenBtn.addEventListener("click", () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+              console.error(`全屏错误: ${err.message}`);
+            });
+          } else {
+            if (document.exitFullscreen) {
+              document.exitFullscreen();
+            }
+          }
+
+          // 发送全屏命令到主页面
+          sendCommand({
+            type: "fullscreen",
+            state: !document.fullscreenElement,
+          });
+        });
+
+        let pressTimer,
+          recording = false;
+        micBtn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          pressTimer = setTimeout(() => {
+            recording = true;
+            // 添加语音活动样式
+            document.querySelector(".toolbar").classList.add("voice-active");
+            // 发送开始录音命令到主页面
+            sendCommand({ type: "voice", action: "start" });
+          }, 300);
+        });
+        micBtn.addEventListener("touchend", () => {
+          clearTimeout(pressTimer);
+          if (recording) {
+            recording = false;
+            // 移除语音活动样式
+            document.querySelector(".toolbar").classList.remove("voice-active");
+            // 发送结束录音命令到主页面
+            sendCommand({ type: "voice", action: "end" });
+          }
+        });
+
+        // 设置面板
+        function syncSettings() {
+          leftSensSlider.value = state.leftSens;
+          leftSensInput.value = state.leftSens;
+          rightSensSlider.value = state.rightSens;
+          rightSensInput.value = state.rightSens;
+        }
+        leftSensSlider.addEventListener("input", () => {
+          state.leftSens = parseFloat(leftSensSlider.value);
+          leftSensInput.value = state.leftSens;
+        });
+        leftSensInput.addEventListener("change", () => {
+          let v = parseFloat(leftSensInput.value) || 1;
+          v = Math.min(3.0, Math.max(0.5, v));
+          state.leftSens = v;
+          leftSensSlider.value = v;
+        });
+        rightSensSlider.addEventListener("input", () => {
+          state.rightSens = parseFloat(rightSensSlider.value);
+          rightSensInput.value = state.rightSens;
+        });
+        rightSensInput.addEventListener("change", () => {
+          let v = parseFloat(rightSensInput.value) || 0.2;
+          v = Math.min(0.5, Math.max(0.1, v));
+          state.rightSens = v;
+          rightSensSlider.value = v;
+        });
+        // 设置按钮点击事件，仅当滚轮存在时显示设置面板
+        settingsBtn.addEventListener("click", () => {
+          const leftWheel = document.getElementById("leftWheelContainer");
+          const rightWheel = document.getElementById("rightWheelContainer");
+
+          if (
+            leftWheel.classList.contains("show") &&
+            rightWheel.classList.contains("show")
+          ) {
+            syncSettings();
+            settingsModal.classList.add("show");
+          }
+        });
+        closeSettingsBtn.addEventListener("click", () => {
+          settingsModal.classList.remove("show");
+        });
+        settingsModal.addEventListener("click", (e) => e.stopPropagation());
+        document.addEventListener("click", (e) => {
+          // 点击外部关闭设置面板
+          if (!settingsModal.contains(e.target) && e.target !== settingsBtn)
+            settingsModal.classList.remove("show");
+        });
+
+        fullscreenBtn.addEventListener("click", () => {
+          if (!document.fullscreenElement)
+            document.documentElement.requestFullscreen();
+          else document.exitFullscreen();
+        });
+
+        document.body.addEventListener(
+          "touchmove",
+          (e) => {
+            if (e.target.closest(".wheel-inline, #mapCanvas, .tool-btn"))
+              e.preventDefault();
+          },
+          { passive: false },
+        );
+
+        // 修改设置按钮点击事件
+        settingsBtn.addEventListener("click", () => {
+          const leftWheel = document.getElementById("leftWheelContainer");
+          const rightWheel = document.getElementById("rightWheelContainer");
+
+          if (
+            leftWheel.classList.contains("show") &&
+            rightWheel.classList.contains("show")
+          ) {
+            syncSettings();
+            settingsModal.classList.add("show");
+          }
+        });
+
+        // 启动
+        resizeCanvas();
+        drawMap();
+        state.leftWheelPos = posFromScale(1.0);
+        state.rightWheelPos = posFromScale(1.0);
+
+        // 触发工具栏弹出效果
+        setTimeout(() => {
+          document.querySelector(".top-toolbar").classList.add("show");
+          document.querySelector(".bottom-toolbar").classList.add("show");
+        }, 100);
+
+        // 触发刻度栏弹出效果
+        setTimeout(() => {
+          document.getElementById("leftWheelContainer").classList.add("show");
+          document.getElementById("rightWheelContainer").classList.add("show");
+        }, 200);
+      })();
+    </script>
+  </body>
+</html>

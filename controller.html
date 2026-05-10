@@ -1,0 +1,4007 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>EasyPDF 手机控制</title>
+    <link rel="icon" type="image/jpg" href="assets/icon/easypdfmain.jpg" />
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Helvetica Neue",
+          "SF Pro Text",
+          sans-serif;
+      }
+
+      body {
+        background: #f0f0f0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        touch-action: none;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+        padding: 0;
+        margin: 0;
+        max-width: none;
+      }
+
+      /* ----- 地图框（上部） ----- */
+      .map-frame {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible; /* 允许滚轮容器溢出显示 */
+        position: relative;
+        margin-bottom: 0;
+        padding: 0;
+      }
+
+      /* 地图框内顶部左右两个小按钮 */
+      .map-top-left {
+        position: absolute;
+        top: 12px;
+        left: 8px;
+        z-index: 10;
+      }
+      .map-top-right {
+        position: absolute;
+        top: 12px;
+        right: 8px;
+        z-index: 10;
+      }
+      .map-small-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 9999px;
+        background: #c3c3c3;
+        border: 1px solid #8a8a8a;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #333333;
+        font-size: 22px;
+        cursor: pointer;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+        transform: translateZ(0);
+      }
+      .map-small-btn:active {
+        transform: scale(0.92);
+        background: #a8a8a8;
+      }
+      .map-small-btn img {
+        width: 50%;
+        height: 50%;
+        filter: grayscale(1) brightness(0);
+      }
+
+      .wheel-inline {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+        cursor: grab;
+        overflow: hidden;
+        border-radius: 0;
+        background: #f5f5f5;
+        z-index: 5; /* 低于工具栏 */
+        transition:
+          transform 0.3s ease,
+          opacity 0.3s ease;
+        opacity: 0;
+        pointer-events: none;
+        margin: 0;
+        padding: 0;
+      }
+      .left-wheel {
+        width: 100vw; /* 始终等于视口宽度（手机屏幕宽度） */
+        height: 200px; /* 初始高度 */
+        max-width: 100vw; /* 确保不会超过屏幕宽度 */
+        border: none;
+        background: #f5f5f5;
+        overflow: hidden;
+        position: relative;
+      }
+      .wheel-pdf-image {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: none;
+        opacity: 0;
+        transform: scale(0.95);
+        transition:
+          opacity 0.5s ease-out,
+          transform 0.5s ease-out;
+        z-index: 1;
+      }
+      .wheel-pdf-image.fade-in {
+        opacity: 1;
+        transform: scale(1);
+      }
+      .right-wheel {
+        right: 0;
+        transform: translateX(100%);
+        border: none;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          rgba(30, 30, 38, 0.1) 0px,
+          rgba(30, 30, 38, 0.1) 10px,
+          transparent 10px,
+          transparent 20px
+        );
+        background-size: 2px 20px;
+        background-position: left center;
+        background-repeat: repeat-y;
+      }
+      .left-wheel.show {
+        transform: translate(-50%, -50%);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .right-wheel.show {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .map-canvas-container {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f5f5f5;
+        overflow: visible; /* 允许视口方框溢出容器 */
+      }
+
+      /* PDF显示区域 */
+      .pdf-viewer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+        display: none;
+        background: #f5f5f5;
+        overflow: hidden;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+      }
+      .pdf-viewer.active {
+        display: flex;
+      }
+      .pdf-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+      }
+
+      /* 方框视口 - 代表主页面当前显示区域（带十字线和中心圆点） */
+      .viewport-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 2px solid #3a8cff;
+        background: transparent;
+        pointer-events: none;
+        z-index: 10;
+        box-sizing: border-box;
+        display: block;
+      }
+
+      /* 水平十字线 */
+      .viewport-box::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #3a8cff;
+        transform: translateY(-50%);
+        opacity: 0.8;
+      }
+
+      /* 垂直十字线 */
+      .viewport-box::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        background: #3a8cff;
+        transform: translateX(-50%);
+        opacity: 0.8;
+      }
+
+      /* 中心圆点 */
+      .viewport-box-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 10px;
+        height: 10px;
+        background: rgba(255, 0, 0, 0.6);
+        border-radius: 50%;
+        z-index: 1;
+      }
+
+      /* ----- 工具栏 ----- */
+      .toolbar {
+        flex-shrink: 0;
+        background: rgba(30, 30, 38, 0.25);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: none;
+        border-radius: 0;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        width: 100%;
+        will-change: transform, opacity;
+      }
+
+      .top-toolbar {
+        box-shadow: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        transform: translateY(-100%);
+        opacity: 0;
+        transition:
+          transform 0.3s ease-in-out,
+          opacity 0.3s ease-in-out;
+      }
+
+      .bottom-toolbar {
+        box-shadow: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        transform: translateY(100%);
+        opacity: 0;
+        transition:
+          transform 0.3s ease-in-out,
+          opacity 0.3s ease-in-out;
+      }
+
+      .top-toolbar.show,
+      .bottom-toolbar.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .tool-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 9999px;
+        background: #c3c3c3;
+        border: 1px solid #8a8a8a;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #333333;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+        touch-action: manipulation;
+        position: relative;
+        transform: translateZ(0);
+        will-change: transform;
+      }
+      #app .toolbar .tool-btn img,
+      #app .toolbar .tool-btn svg {
+        width: 50%;
+        height: 50%;
+        min-width: 20px;
+        min-height: 20px;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        display: block;
+        pointer-events: none;
+        filter: brightness(0.7) !important;
+      }
+
+      .toolbar.voice-active .tool-btn:not(#micBtn) {
+        opacity: 0.3;
+        transform: scale(0.95);
+        filter: blur(2px);
+      }
+      .toolbar.voice-active .tool-btn:not(#micBtn) img {
+        filter: brightness(0.7) opacity(0.3) !important;
+      }
+      .tool-btn:active {
+        transform: scale(0.92);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+
+      /* 历史下拉菜单 */
+      .history-dropdown {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(15, 25, 38, 0.9);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        padding: 16px;
+        display: none;
+        z-index: 100;
+        min-width: 200px;
+      }
+      .history-dropdown.show {
+        display: block;
+      }
+      .history-item {
+        padding: 12px 16px;
+        border-radius: 18px;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        margin-bottom: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .history-item:last-child {
+        margin-bottom: 0;
+      }
+      .history-item:active {
+        background: rgba(80, 120, 170, 0.4);
+      }
+
+      /* 历史文件弹窗 */
+      .history-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+      }
+
+      .modal-content {
+        position: relative;
+        width: 80%;
+        max-width: 320px;
+        background: #1a1a1e;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .modal-title {
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .modal-close {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 20px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-body {
+        padding: 16px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .empty-history {
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+        padding: 20px;
+        font-size: 14px;
+      }
+
+      /* 加载提示弹窗（与电脑端一致） */
+      .loading-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(12px);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 60px;
+        font-size: 15px;
+        z-index: 1001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* 省略号动画 */
+      .loading-dots {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .loading-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #c2c2c2;
+        margin: 0 2px;
+        opacity: 0;
+        animation: dotFade 1.4s infinite ease-in-out;
+      }
+
+      .loading-dot:nth-child(1) {
+        animation-delay: 0s;
+      }
+
+      .loading-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .loading-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes dotFade {
+        0%,
+        80%,
+        100% {
+          opacity: 0;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+
+      /* 文件上传专用的loading样式 */
+      .upload-loading-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .upload-loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+      }
+
+      .upload-loading-content {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: #1a1a1e;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .upload-loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #5078aa;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 16px;
+      }
+
+      .upload-success-icon,
+      .upload-error-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+      }
+
+      .upload-success-icon {
+        background: #4caf50;
+        color: white;
+      }
+
+      .upload-error-icon {
+        background: #f44336;
+        color: white;
+      }
+
+      .upload-loading-text {
+        color: white;
+        font-size: 16px;
+      }
+
+      /* 设置面板 */
+      .settings-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 400px;
+        background: rgba(15, 25, 38, 0.8);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 20px 18px;
+        z-index: 150;
+        display: none;
+        box-shadow: 0 25px 40px black;
+      }
+      .settings-modal.show {
+        display: block;
+      }
+      .modal-title {
+        color: white;
+        font-size: 18px;
+        margin-bottom: 18px;
+        text-align: center;
+      }
+      .setting-item {
+        margin-bottom: 16px;
+      }
+      .setting-label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .setting-slider {
+        width: 100%;
+        margin: 6px 0;
+      }
+      .setting-number {
+        width: 70px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 20px;
+        padding: 6px 10px;
+        color: white;
+        text-align: center;
+        font-size: 14px;
+        pointer-events: none;
+      }
+      .close-modal-btn {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 36px;
+        text-align: center;
+        color: white;
+        cursor: pointer;
+      }
+
+      /* 语音覆盖层 */
+
+      /* 状态显示 */
+      .status {
+        position: absolute;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        pointer-events: none;
+        z-index: 10;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+      }
+
+      /* 屏幕管理模态框 */
+      .screen-dropdown-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .screen-dropdown-overlay.show {
+        display: flex;
+        opacity: 1;
+      }
+
+      .screen-dropdown {
+        background: #c2c2c2;
+        backdrop-filter: blur(20px);
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4vh;
+        width: 90vw;
+        max-width: 40vh;
+        height: auto;
+        max-height: 85vh;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2vh;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+        box-sizing: border-box;
+      }
+
+      .screen-dropdown-overlay.show .screen-dropdown {
+        transform: scale(1);
+      }
+
+      .dropdown-title {
+        color: #333333;
+        font-size: 3vh;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 1vh;
+      }
+
+      .scan-btn {
+        width: 100%;
+        padding: 2vh 2.5vh;
+        background: #ff9800;
+        border: none;
+        border-radius: 6px;
+        color: #ffffff;
+        font-size: 2.2vh;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: 1vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+
+      .scan-btn:hover {
+        opacity: 0.9;
+      }
+
+      .url-input-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1vh;
+        margin-bottom: 1vh;
+      }
+
+      .url-input {
+        width: 100%;
+        padding: 2vh 2.5vh;
+        background: white;
+        border: 1px solid #999999;
+        border-radius: 6px;
+        color: #333;
+        font-size: 2.2vh;
+        outline: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+
+      .url-input:focus {
+        border-color: #ff9800;
+        background: white;
+      }
+
+      .url-input::placeholder {
+        color: #999;
+      }
+
+      .url-submit-btn {
+        width: 100%;
+        padding: 2vh 2.5vh;
+        background: #ff9800;
+        border: none;
+        border-radius: 6px;
+        color: #ffffff;
+        font-size: 2.2vh;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+
+      .url-submit-btn:hover {
+        border-color: #5078aa;
+      }
+
+      .screen-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        padding-right: 0;
+      }
+
+      .screen-list::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .screen-list::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 2px;
+      }
+
+      .screen-list::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 2px;
+      }
+
+      .screen-item {
+        padding: 0 2vh;
+        border-radius: 6px;
+        background: white;
+        color: #333;
+        font-size: 2.2vh;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        border: 1px solid #999999;
+        box-sizing: border-box;
+        margin-right: 0;
+        height: 7.2vh;
+        gap: 1.5vh;
+      }
+
+      .screen-item:hover {
+        border-color: #ff9800;
+      }
+
+      .screen-item.active {
+        background: #4a4a4a;
+        color: #fff;
+        border-color: #4a4a4a;
+      }
+
+      .screen-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .screen-actions {
+        display: flex;
+        gap: 1.5vh;
+      }
+
+      /* 1. 圆形主次屏切换按钮 */
+      .main-toggle-btn {
+        width: 5.76vh;
+        height: 5.76vh;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-size: 2.2vh;
+        font-weight: 500;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .main-toggle-btn.main {
+        background: #ff9800;
+      }
+
+      .main-toggle-btn.secondary {
+        background: #fff;
+        color: #333;
+        border: 1px solid #999;
+      }
+
+      /* 2. 圆形1/2功能切换按钮 */
+      .func-toggle-btn {
+        width: 5.76vh;
+        height: 5.76vh;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-size: 2.2vh;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .func-toggle-btn.mode1 {
+        background: #fff;
+        color: #333;
+        border: 1px solid #999;
+      }
+
+      .func-toggle-btn.mode2 {
+        background: #ff9800;
+        color: #fff;
+      }
+
+      /* 3. 圆形设置操作按钮 */
+      .settings-btn {
+        width: 5.76vh;
+        height: 5.76vh;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .settings-btn::before {
+        content: "";
+        display: inline-block;
+        width: 2.8vh;
+        height: 2.8vh;
+        background-image: url("assets/icon/settings.svg");
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+      }
+
+      .settings-btn {
+        background: #fff;
+        border: 1px solid #999;
+      }
+
+      .settings-btn.disabled {
+        background: #ccc;
+        border-color: #999;
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      .settings-btn.disabled::before {
+        filter: grayscale(1);
+      }
+
+      /* 次屏幕控制界面 */
+      .secondary-control {
+        align-items: stretch;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 2vh;
+      }
+
+      .control-title {
+        color: #333333;
+        font-size: 2.5vh;
+        font-weight: 600;
+        text-align: center;
+        width: 100%;
+      }
+
+      .control-toolbar {
+        display: flex;
+        gap: 1vh;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0;
+        margin: 0;
+      }
+
+      .control-btn {
+        flex: 1;
+        padding: 2vh 1.5vh;
+        border-radius: 6px;
+        background: #fff;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        min-width: 0;
+      }
+
+      .control-btn img {
+        width: 2.5vh;
+        height: 2.5vh;
+      }
+
+      .control-btn:active {
+        background: #ff9800;
+      }
+
+      .control-btn.disabled {
+        background: #ddd;
+        border-color: #999;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      .control-btn.disabled img {
+        filter: grayscale(1);
+      }
+
+      .exit-btn {
+        width: 100%;
+        padding: 2vh 2.5vh;
+        background: #ff9800;
+        border: none;
+        border-radius: 6px;
+        color: #ffffff;
+        font-size: 2.2vh;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+
+      .exit-btn.disabled {
+        background: #ddd;
+        color: #999;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      .exit-btn:active {
+        opacity: 0.8;
+      }
+
+      /* 比例设置区域 */
+      .ratio-control-section {
+        width: 100%;
+        padding-top: 2vh;
+        border-top: 1px solid #ccc;
+        display: none;
+        flex-direction: column;
+        gap: 2vh;
+      }
+
+      .ratio-control-section.show {
+        display: flex;
+      }
+
+      .ratio-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5vh;
+      }
+
+      .ratio-label {
+        font-size: 2.2vh;
+        color: #333;
+      }
+
+      .ratio-row input[type="range"] {
+        width: 100%;
+        height: 1.5vh;
+        -webkit-appearance: none;
+        appearance: none;
+        background: #ddd;
+        border-radius: 1vh;
+        outline: none;
+      }
+
+      .ratio-row input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 3vh;
+        height: 3vh;
+        background: #ff9800;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+
+      .anchor-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1vh;
+        width: 100%;
+      }
+
+      .anchor-btn {
+        padding: 2vh 1vh;
+        border: 1px solid #999;
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        position: relative;
+      }
+
+      .anchor-btn:hover {
+        border-color: #ff9800;
+      }
+
+      .anchor-btn.active {
+        background: #ff9800;
+        border-color: #ff9800;
+      }
+
+      .anchor-btn.active .anchor-dot {
+        background: #fff;
+      }
+
+      .anchor-dot {
+        width: 1.5vh;
+        height: 1.5vh;
+        border-radius: 50%;
+        background: #ff9800;
+      }
+
+      .ratio-actions {
+        display: flex;
+        gap: 2vh;
+        margin-top: 1vh;
+      }
+
+      .ratio-btn {
+        flex: 1;
+        padding: 2vh 2.5vh;
+        border: none;
+        border-radius: 6px;
+        font-size: 2.2vh;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .ratio-btn.cancel-btn {
+        background: #ddd;
+        color: #333;
+      }
+
+      .ratio-btn.confirm-btn {
+        background: #ff9800;
+        color: #fff;
+      }
+
+      .ratio-btn:active {
+        opacity: 0.8;
+      }
+
+      /* 登录弹窗 */
+      .login-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .login-overlay.show {
+        display: flex;
+        opacity: 1;
+      }
+
+      .login-form {
+        background: #c2c2c2;
+        backdrop-filter: blur(20px);
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4vh;
+        width: 40vh;
+        min-width: 280px;
+        max-width: 90vw;
+        height: auto;
+        max-height: 80vh;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2vh;
+        transform: scale(0.9);
+        transition: transform 0.3s ease;
+      }
+
+      .login-overlay.show .login-form {
+        transform: scale(1);
+      }
+
+      .login-title {
+        color: #333333;
+        font-size: 3vh;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 1vh;
+      }
+
+      .login-input {
+        width: 100%;
+        background: white;
+        border: 1px solid #999999;
+        border-radius: 6px;
+        padding: 2vh 2.5vh;
+        color: #333333;
+        font-size: 2.2vh;
+        outline: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+
+      .login-input:focus {
+        border-color: #ff9800;
+        background: white;
+      }
+
+      .login-button {
+        width: 100%;
+        background: #ff9800;
+        border: none;
+        border-radius: 6px;
+        padding: 2vh;
+        color: white;
+        font-size: 2.2vh;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+
+      .login-button:hover {
+        background: #f57c00;
+      }
+
+      .login-button:active {
+        background: #e65100;
+      }
+
+      .login-error {
+        color: #e74c3c;
+        font-size: 13px;
+        text-align: center;
+        margin-top: 10px;
+        min-height: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 顶部工具栏 -->
+      <div class="toolbar top-toolbar" style="width: 100%">
+        <!-- 1.设置按钮 -->
+        <div class="tool-btn" id="settingsBtn">
+          <img
+            src="assets/icon/settings.svg"
+            alt="设置"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 2.打开文件 -->
+        <div class="tool-btn" id="openFileBtn">
+          <img
+            src="assets/icon/open.svg"
+            alt="打开"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 3.设为最佳 -->
+        <div class="tool-btn" id="setBestBtn">
+          <img
+            src="assets/icon/heart-solid.svg"
+            alt="最佳"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 4.历史记录 -->
+        <div class="tool-btn" id="historyBtn" style="position: relative">
+          <img
+            src="assets/icon/history.svg"
+            alt="历史"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+          <div class="history-dropdown" id="historyDropdown"></div>
+        </div>
+        <!-- 5.切换比例 -->
+        <div class="tool-btn" id="toggleScaleBtn">
+          <img
+            src="assets/icon/refresh.svg"
+            alt="切换"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 6.全屏按钮 -->
+        <div class="tool-btn" id="fullscreenBtn">
+          <img
+            src="assets/icon/fullscreen.svg"
+            alt="全屏"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+      </div>
+
+      <!-- 地图框 -->
+      <div class="map-frame" id="mapFrame">
+        <!-- PDF显示区域 -->
+        <div class="pdf-viewer" id="pdfViewer"></div>
+        <!-- 地图主体区域 -->
+        <div class="map-canvas-container"></div>
+        <!-- 左边滚轮 -->
+        <div class="wheel-inline left-wheel" id="leftWheelContainer">
+          <!-- PDF显示区域 -->
+          <img id="wheelPdfImage" class="wheel-pdf-image" />
+          <!-- 蓝框视口 -->
+          <div id="viewportBox" class="viewport-box">
+            <div class="viewport-box-center"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部工具栏 -->
+      <div class="toolbar bottom-toolbar" style="width: 100%">
+        <!-- 坐标系按钮 -->
+        <div class="tool-btn" id="coordinateBtn">
+          <img
+            src="assets/icon/coordinate.svg"
+            alt="坐标系"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 语音话筒 -->
+        <div class="tool-btn" id="micBtn">
+          <img
+            src="assets/icon/voice.svg"
+            alt="语音"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+        <!-- 手柄按钮（屏幕管理） -->
+        <div class="tool-btn" id="controllerBtn">
+          <img
+            src="assets/icon/controller.svg"
+            alt="手柄"
+            style="width: 24px; height: 24px; filter: invert(1)"
+          />
+        </div>
+      </div>
+
+      <!-- 语音覆盖层 -->
+
+      <!-- 屏幕管理模态框 -->
+      <div class="screen-dropdown-overlay" id="screenModal">
+        <div class="screen-dropdown">
+          <button class="scan-btn" id="scanBtn">扫描二维码</button>
+          <!-- URL输入区域 -->
+          <div class="url-input-section">
+            <input
+              type="text"
+              id="screenUrlInput"
+              placeholder="粘贴URL..."
+              class="url-input"
+            />
+            <button class="url-submit-btn" id="urlSubmitBtn">连接</button>
+          </div>
+          <div class="screen-list" id="screenList"></div>
+        </div>
+      </div>
+
+      <!-- 次屏幕控制模态框 -->
+      <div class="screen-dropdown-overlay" id="secondaryControlModal">
+        <div class="screen-dropdown secondary-control">
+          <div class="control-title" id="controlScreenTitle">次屏控制</div>
+          <!-- 工具栏按钮 -->
+          <div class="control-toolbar" id="controlToolbar">
+            <div class="control-btn" id="ctrlRatioBtn" title="比例设置">
+              <img src="assets/icon/ratio.svg" alt="比例设置" />
+            </div>
+            <div class="control-btn" id="ctrlPanBtn" title="平移">
+              <img src="assets/icon/rivet.svg" alt="平移" />
+            </div>
+            <div class="control-btn" id="ctrlBgToggleBtn" title="切换背景">
+              <img src="assets/icon/screen.svg" alt="切换背景" />
+            </div>
+            <div class="control-btn" id="ctrlFullscreenBtn" title="全屏">
+              <img src="assets/icon/fullscreen.svg" alt="全屏" />
+            </div>
+          </div>
+          <!-- 退出按钮 -->
+          <button class="exit-btn" id="exitControlBtn">退出控制</button>
+          <!-- 比例设置区域 -->
+          <div class="ratio-control-section" id="ratioControlSection">
+            <div class="ratio-row">
+              <div class="ratio-label">
+                X: <span id="ctrlXValue">100%</span>
+              </div>
+              <input
+                type="range"
+                id="ctrlXSlider"
+                min="10"
+                max="200"
+                value="100"
+              />
+            </div>
+            <div class="ratio-row">
+              <div class="ratio-label">
+                Y: <span id="ctrlYValue">100%</span>
+              </div>
+              <input
+                type="range"
+                id="ctrlYSlider"
+                min="10"
+                max="200"
+                value="100"
+              />
+            </div>
+            <div class="ratio-row">
+              <div class="ratio-label">锚点</div>
+              <div class="anchor-grid" id="ctrlAnchorGrid">
+                <button
+                  class="anchor-btn active"
+                  data-anchor="top-left"
+                  title="左上角"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="top-center"
+                  title="上中"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="top-right"
+                  title="右上角"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="center-left"
+                  title="左中"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button class="anchor-btn" data-anchor="center" title="中心">
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="center-right"
+                  title="右中"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="bottom-left"
+                  title="左下角"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="bottom-center"
+                  title="下中"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+                <button
+                  class="anchor-btn"
+                  data-anchor="bottom-right"
+                  title="右下角"
+                >
+                  <span class="anchor-dot"></span>
+                </button>
+              </div>
+            </div>
+            <div class="ratio-actions">
+              <button class="ratio-btn cancel-btn" id="ctrlRatioCancelBtn">
+                取消
+              </button>
+              <button class="ratio-btn confirm-btn" id="ctrlRatioConfirmBtn">
+                确认
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置面板 -->
+      <div class="settings-modal" id="settingsModal">
+        <div class="modal-title">滚轮精确度</div>
+        <div class="setting-item">
+          <div class="setting-label">
+            左轮 (大比例调整)
+            <input
+              type="number"
+              id="leftSensInput"
+              step="0.1"
+              min="0.5"
+              max="3.0"
+              value="1.0"
+              class="setting-number"
+              readonly
+            />
+          </div>
+          <input
+            type="range"
+            min="0.5"
+            max="3.0"
+            step="0.1"
+            value="1.0"
+            class="setting-slider"
+            id="leftSensSlider"
+          />
+        </div>
+        <div class="close-modal-btn" id="closeSettingsBtn">完成</div>
+      </div>
+
+      <!-- 隐藏文件input -->
+      <input
+        type="file"
+        id="fileInput"
+        accept=".pdf,application/pdf"
+        style="display: none"
+      />
+
+      <!-- 状态显示 -->
+      <div class="status" id="status">连接中...</div>
+    </div>
+
+    <!-- Supabase 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // WebSocket连接
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        // 多屏幕管理
+        const screenManager = {
+          sessionId: null,
+          mainScreen: null, // 主屏windowId
+          currentScreen: null, // 当前控制的屏幕
+          screens: {}, // 所有屏幕 { windowId: { name, isMain, connectedAt } }
+          maxScreens: 4, // 最多4个屏幕
+        };
+
+        // 获取URL参数
+        function getURLParams() {
+          const params = new URLSearchParams(window.location.search);
+          return {
+            session: params.get("session"),
+            date: params.get("date"),
+            window: params.get("window"),
+          };
+        }
+
+        // 初始化WebSocket连接
+        function initWebSocket() {
+          const params = getURLParams();
+          if (!params.session) {
+            document.getElementById("status").textContent = "缺少session参数";
+            return;
+          }
+
+          const protocol =
+            window.location.protocol === "https:" ? "wss:" : "ws:";
+          const host = window.location.host;
+          const wsUrl = `${protocol}//${host}/ws?session=${params.session}&type=controller`;
+          ws = new WebSocket(wsUrl);
+
+          ws.onopen = function () {
+            document.getElementById("status").textContent = "已连接";
+            reconnectAttempts = 0;
+            console.log("WebSocket连接已建立");
+
+            // 请求当前登录状态
+            sendCommand({ type: "getLoginStatus" });
+
+            // 连接成功后查询主页面状态
+            sendCommand({ type: "getState" });
+
+            // 发送屏幕尺寸信息
+            sendScreenInfo();
+          };
+
+          ws.onmessage = function (event) {
+            try {
+              const data = JSON.parse(event.data);
+              handleServerMessage(data);
+            } catch (error) {
+              console.error("解析消息失败:", error);
+            }
+          };
+
+          ws.onclose = function () {
+            document.getElementById("status").textContent = "连接已断开";
+            console.log("WebSocket连接已关闭");
+
+            // 尝试重新连接
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              setTimeout(initWebSocket, reconnectAttempts * 2000);
+            }
+          };
+
+          ws.onerror = function (error) {
+            document.getElementById("status").textContent = "连接错误";
+            console.error("WebSocket错误:", error);
+          };
+        }
+
+        // 处理服务器消息
+        function handleServerMessage(message) {
+          // 提取windowId（所有消息都应该包含）
+          if (message.windowId) {
+            handleScreenConnect(message.windowId);
+          }
+
+          switch (message.type) {
+            case "connected":
+              document.getElementById("status").textContent = "已连接到主页面";
+              console.log("已连接到主页面:", message.message);
+              break;
+            case "initScale":
+              state.mapScale = message.scale;
+              state.leftWheelPos = posFromScale(message.scale);
+              break;
+            case "zoom":
+              state.mapScale = message.scale;
+              state.leftWheelPos = posFromScale(message.scale);
+              break;
+            case "fileOpened":
+              // 主页面打开了文件，切换到PDF视图并请求图片
+              showPDFView();
+              // 发送屏幕尺寸信息，让电脑端发送渲染好的图片
+              sendScreenInfo();
+              break;
+            case "clearFile":
+              // 主页面关闭了文件，手机端返回地图视图
+              hidePDFView();
+              break;
+            case "viewport":
+              // 更新方框视口
+              updateViewportBox(message);
+              break;
+            case "loading":
+              // 显示/隐藏加载提示
+              showLoading(message.show, message.message);
+              break;
+            case "state":
+              // 主页面状态回复
+              if (message.hasFile) {
+                // 如果有视口尺寸信息，设置容器大小
+                if (message.viewportWidth && message.viewportHeight) {
+                  setContainerSize(
+                    message.viewportWidth,
+                    message.viewportHeight,
+                  );
+                }
+                // 主页面有文件打开，切换到PDF视图
+                showPDFView();
+                // 发送屏幕尺寸信息请求图片
+                sendScreenInfo();
+              }
+              break;
+            case "pdfImage":
+              // 接收电脑端发送的PDF图片
+              handlePDFImage(message);
+              break;
+            case "screenStatus":
+              // 更新屏幕状态
+              updateScreenList();
+              break;
+            case "loginStatus":
+              // 处理服务器返回的登录状态
+              console.log("📥 手机端收到登录状态:", message.isLoggedIn);
+              if (message.isLoggedIn) {
+                isLoggedIn = true;
+                console.log("✅ 手机端更新登录状态为已登录");
+                hideLoginModal();
+              } else {
+                isLoggedIn = false;
+                console.log("❌ 手机端更新登录状态为未登录");
+              }
+              break;
+            default:
+              console.log("未知消息类型:", message.type);
+          }
+        }
+
+        // 处理屏幕连接
+        function handleScreenConnect(windowId) {
+          const params = getURLParams();
+          screenManager.sessionId = params.session;
+
+          // 如果是新屏幕，添加到列表
+          if (!screenManager.screens[windowId]) {
+            const screenCount = Object.keys(screenManager.screens).length;
+
+            // 检查是否超过最大屏幕数
+            if (screenCount >= screenManager.maxScreens) {
+              console.warn("已达最大屏幕数");
+              return;
+            }
+
+            // 取消默认主屏，所有屏幕都是次屏
+            const isMain = false;
+
+            screenManager.screens[windowId] = {
+              id: windowId,
+              name: `屏幕${screenCount + 1}`,
+              isMain: isMain,
+              funcMode: 1,
+              connectedAt: Date.now(),
+            };
+
+            // 设置主屏
+            if (isMain) {
+              screenManager.mainScreen = windowId;
+              screenManager.currentScreen = windowId;
+            }
+
+            // 更新UI
+            updateScreenList();
+            console.log("屏幕已连接:", screenManager.screens[windowId]);
+          }
+        }
+
+        // 更新屏幕列表UI
+        function updateScreenList() {
+          const screenList = document.getElementById("screenList");
+          if (!screenList) return;
+
+          const screens = Object.values(screenManager.screens);
+          screenList.innerHTML = "";
+
+          screens.forEach((screen) => {
+            const item = document.createElement("div");
+            item.className = `screen-item ${screen.isMain ? "main" : ""} ${screen.id === screenManager.currentScreen ? "active" : ""}`;
+
+            // 单击选中
+            item.onclick = () => {
+              screenManager.currentScreen = screen.id;
+              updateScreenList();
+            };
+
+            // 创建屏幕信息区域
+            const infoDiv = document.createElement("div");
+            infoDiv.className = "screen-info";
+            infoDiv.textContent = screen.isMain ? "主屏" : "次屏";
+
+            // 创建操作按钮容器
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "screen-actions";
+
+            // 1. 创建圆形主次屏切换按钮
+            const mainToggleBtn = document.createElement("button");
+            mainToggleBtn.className = `main-toggle-btn ${screen.isMain ? "main" : "secondary"}`;
+            mainToggleBtn.textContent = screen.isMain ? "主" : "次";
+            mainToggleBtn.title = screen.isMain ? "切换为次屏" : "切换为主屏";
+            mainToggleBtn.onclick = (e) => {
+              e.stopPropagation();
+              toggleMainScreen(screen.id);
+            };
+
+            // 2. 创建1/2功能切换按钮
+            const funcToggleBtn = document.createElement("button");
+            funcToggleBtn.className = `func-toggle-btn ${screen.funcMode === 2 ? "mode2" : "mode1"}`;
+            funcToggleBtn.textContent = screen.funcMode === 2 ? "2" : "1";
+            funcToggleBtn.title =
+              screen.funcMode === 2 ? "切换到模式1" : "切换到模式2";
+            funcToggleBtn.onclick = (e) => {
+              e.stopPropagation();
+              toggleFuncMode(screen.id);
+            };
+
+            // 3. 创建设置操作按钮
+            const settingsBtn = document.createElement("button");
+            settingsBtn.className = `settings-btn ${screen.isMain ? "disabled" : ""}`;
+            settingsBtn.title = screen.isMain ? "主屏不可设置" : "进入控制";
+
+            if (!screen.isMain) {
+              settingsBtn.onclick = (e) => {
+                e.stopPropagation();
+                showSecondaryScreenControl(screen.id);
+              };
+            } else {
+              settingsBtn.disabled = true;
+            }
+
+            actionsDiv.appendChild(mainToggleBtn);
+            actionsDiv.appendChild(funcToggleBtn);
+            actionsDiv.appendChild(settingsBtn);
+            item.appendChild(infoDiv);
+            item.appendChild(actionsDiv);
+
+            screenList.appendChild(item);
+          });
+        }
+
+        // 切换功能模式
+        function toggleFuncMode(windowId) {
+          const screen = screenManager.screens[windowId];
+          if (!screen) return;
+
+          screen.funcMode = screen.funcMode === 2 ? 1 : 2;
+          updateScreenList();
+
+          console.log(`屏幕 ${windowId} 功能模式切换为: ${screen.funcMode}`);
+        }
+
+        // 显示次屏幕控制界面
+        let currentControlScreenId = null;
+
+        function showSecondaryScreenControl(windowId) {
+          const screen = screenManager.screens[windowId];
+          if (!screen) return;
+
+          currentControlScreenId = windowId;
+
+          // 更新标题
+          const title = document.getElementById("controlScreenTitle");
+          if (title) {
+            title.textContent = "次屏控制";
+          }
+
+          // 隐藏屏幕管理弹窗
+          const screenModal = document.getElementById("screenModal");
+          if (screenModal) {
+            screenModal.classList.remove("show");
+          }
+
+          // 显示次屏幕控制弹窗
+          const controlModal = document.getElementById("secondaryControlModal");
+          if (controlModal) {
+            controlModal.classList.add("show");
+          }
+        }
+
+        // 退出次屏幕控制
+        function exitSecondaryScreenControl() {
+          // 隐藏次屏幕控制弹窗
+          const controlModal = document.getElementById("secondaryControlModal");
+          if (controlModal) {
+            controlModal.classList.remove("show");
+          }
+
+          // 显示屏幕管理弹窗
+          const screenModal = document.getElementById("screenModal");
+          if (screenModal) {
+            screenModal.classList.add("show");
+          }
+
+          currentControlScreenId = null;
+        }
+
+        // 切换主屏/次屏（互相独立，无互斥）
+        function toggleMainScreen(windowId) {
+          const screen = screenManager.screens[windowId];
+          if (!screen) return;
+
+          // 直接切换，不影响其他屏幕
+          screen.isMain = !screen.isMain;
+
+          // 更新主屏引用
+          if (screen.isMain) {
+            screenManager.mainScreen = windowId;
+          } else {
+            // 如果当前主屏是这个屏幕，清空主屏引用
+            if (screenManager.mainScreen === windowId) {
+              screenManager.mainScreen = null;
+            }
+          }
+
+          updateScreenList();
+
+          // 通知所有屏幕切换状态
+          const screens = Object.values(screenManager.screens).map((s) => ({
+            windowId: s.id,
+            isMain: s.isMain,
+            isCurrent: s.id === screenManager.currentScreen,
+            name: s.name,
+          }));
+
+          sendCommand({
+            type: "screenStatus",
+            screens: screens,
+            mainScreen: screenManager.mainScreen,
+            currentScreen: screenManager.currentScreen,
+            totalScreens: Object.keys(screenManager.screens).length,
+          });
+        }
+
+        // 切换到指定屏幕
+        function switchScreen(windowId) {
+          const screen = screenManager.screens[windowId];
+          if (!screen) return;
+
+          screenManager.currentScreen = windowId;
+          updateScreenList();
+
+          // 通知所有屏幕切换状态
+          const screens = Object.values(screenManager.screens).map((s) => ({
+            windowId: s.id,
+            isMain: s.isMain,
+            name: s.name,
+          }));
+          sendCommand({
+            type: "switchScreen",
+            windowId: windowId,
+            isMain: screen.isMain,
+            screenName: screen.name,
+            totalScreens: Object.keys(screenManager.screens).length,
+            screens: screens,
+          });
+
+          // 震动反馈
+          if (vibrateSupported) {
+            navigator.vibrate(50);
+          }
+        }
+
+        // 切换屏幕状态（主屏/次屏）
+        function toggleScreenStatus(windowId) {
+          const screen = screenManager.screens[windowId];
+          if (!screen) return;
+
+          // 主屏不可切换为次屏
+          if (screen.isMain) {
+            console.log("主屏不可切换为次屏");
+            return;
+          }
+
+          // 切换状态
+          screen.isMain = !screen.isMain;
+
+          // 更新名称
+          if (screen.isMain) {
+            screen.name = "主屏";
+          } else {
+            // 生成次屏名称
+            const secondaryScreens = Object.values(
+              screenManager.screens,
+            ).filter((s) => !s.isMain);
+            const index = secondaryScreens.findIndex((s) => s.id === windowId);
+            screen.name = `次屏${index + 1}`;
+          }
+
+          // 更新主屏记录（保持兼容）
+          if (screen.isMain) {
+            screenManager.mainScreen = windowId;
+          } else if (screenManager.mainScreen === windowId) {
+            // 如果取消的是当前主屏，找第一个主屏作为主主屏
+            const firstMain = Object.values(screenManager.screens).find(
+              (s) => s.isMain,
+            );
+            screenManager.mainScreen = firstMain ? firstMain.id : null;
+          }
+
+          // 更新UI
+          updateScreenList();
+
+          // 通知所有屏幕
+          const screens = Object.values(screenManager.screens).map((s) => ({
+            windowId: s.id,
+            isMain: s.isMain,
+            name: s.name,
+          }));
+          sendCommand({
+            type: "screenStatus",
+            windowId: windowId,
+            totalScreens: Object.keys(screenManager.screens).length,
+            screens: screens,
+          });
+        }
+
+        // 处理电脑端发送的PDF图片
+        function handlePDFImage(message) {
+          if (!message.imageData) {
+            console.warn("PDF图片数据为空");
+            return;
+          }
+
+          console.log("接收PDF图片，数据大小:", message.imageData.length);
+
+          // 切换到PDF视图
+          showPDFView();
+
+          // 根据方向缓存图片
+          const orientation = message.orientation || getCurrentOrientation();
+          imageCache[orientation] = message.imageData;
+          imageCache.lastInfo = {
+            pageWidth: message.pageWidth,
+            pageHeight: message.pageHeight,
+            phoneWidth: message.phoneWidth,
+            phoneHeight: message.phoneHeight,
+            renderScale: message.renderScale,
+          };
+
+          // 同步电脑端的缩放比例，确保两端状态一致
+          if (message.scale !== undefined) {
+            state.mapScale = message.scale;
+            console.log("同步电脑端缩放比例:", state.mapScale);
+          }
+
+          // 同步电脑端的偏移量，确保拖拽状态一致（解决缩放后拖拽位置跳变问题）
+          if (message.offsetX !== undefined && message.offsetY !== undefined) {
+            state.offsetX = message.offsetX;
+            state.offsetY = message.offsetY;
+            console.log("同步电脑端偏移量:", state.offsetX, state.offsetY);
+          }
+
+          // 如果包含视口信息，更新视口方框位置
+          if (
+            message.viewportLeft !== undefined &&
+            message.viewportTop !== undefined
+          ) {
+            updateViewportBox({
+              left: message.viewportLeft,
+              top: message.viewportTop,
+              width: message.viewportWidth,
+              height: message.viewportHeight,
+              pageWidth: message.pageWidth,
+              pageHeight: message.pageHeight,
+            });
+          }
+
+          // 在滚轮容器中显示PDF图片
+          if (message.imageData && message.imageData.length > 0) {
+            const leftWheel = document.getElementById("leftWheelContainer");
+            const wheelPdfImage = document.getElementById("wheelPdfImage");
+            if (leftWheel && wheelPdfImage) {
+              leftWheel.classList.add("show"); // 确保滚轮容器可见
+
+              // 清除之前的动画类，为新图片准备
+              wheelPdfImage.classList.remove("fade-in");
+              // 先隐藏图片
+              wheelPdfImage.style.display = "none";
+
+              // 创建新的Image对象加载图片，确保加载成功后再显示
+              const img = new Image();
+              let loadTimeout = null;
+              const timeoutMs = 10000; // 10秒超时
+
+              // 设置超时处理
+              loadTimeout = setTimeout(function () {
+                console.error("PDF图片加载超时");
+                img.src = ""; // 取消加载
+                wheelPdfImage.style.display = "none";
+              }, timeoutMs);
+
+              img.onload = function () {
+                clearTimeout(loadTimeout); // 清除超时
+                // 设置新图片源
+                wheelPdfImage.src = message.imageData;
+
+                // 关键：强制浏览器重新渲染的多重保障
+                // 1. 确保display为none
+                wheelPdfImage.style.display = "none";
+                // 2. 移除动画类
+                wheelPdfImage.classList.remove("fade-in");
+                // 3. 触发重排
+                void wheelPdfImage.offsetHeight;
+
+                // 4. 显示图片
+                wheelPdfImage.style.display = "block";
+                // 5. 再次触发重排确保display生效
+                void wheelPdfImage.offsetHeight;
+
+                // 6. 使用 requestAnimationFrame 确保 CSS 渲染完成后再触发动画
+                requestAnimationFrame(function () {
+                  // 再次确保移除动画类后添加
+                  wheelPdfImage.classList.remove("fade-in");
+                  void wheelPdfImage.offsetHeight;
+                  wheelPdfImage.classList.add("fade-in");
+                  console.log("PDF图片加载成功并显示（渐入动画）");
+                });
+              };
+              img.onerror = function (error) {
+                clearTimeout(loadTimeout); // 清除超时
+                console.error("PDF图片加载失败:", error);
+                wheelPdfImage.style.display = "none";
+              };
+
+              // 检查图片数据格式是否正确
+              if (message.imageData.startsWith("data:image/")) {
+                img.src = message.imageData;
+              } else {
+                console.error("图片数据格式不正确");
+              }
+            } else {
+              console.error("滚轮容器或图片元素不存在");
+            }
+          } else {
+            console.warn("PDF图片数据为空或长度为0");
+          }
+
+          // 显示图片（蓝框）
+          displayPDFImage(message.imageData, message);
+        }
+
+        // 显示PDF图片（双缓冲无闪烁）
+        function displayPDFImage(imageData, info) {
+          console.log("开始显示PDF图片 - 图片数据长度:", imageData.length);
+          console.log("图片信息:", info);
+
+          // 获取DOM元素
+          const mapContainer = document.querySelector(".map-canvas-container");
+          const pdfViewer = document.getElementById("pdfViewer");
+
+          if (!mapContainer || !pdfViewer) {
+            console.error("DOM元素获取失败");
+            return;
+          }
+
+          // 激活PDF查看器
+          showPDFView();
+
+          // 如果有电脑端发送的数据，显示蓝框（不显示图片）
+          if (imageData && imageData.length > 0) {
+            // 显示蓝框
+            showViewportBox();
+            console.log("PDF数据接收完成");
+          }
+        }
+
+        // 显示视口蓝框
+        function showViewportBox() {
+          const viewportBox = document.getElementById("viewportBox");
+          if (viewportBox) {
+            viewportBox.style.display = "block";
+          }
+        }
+
+        // 隐藏视口蓝框
+        function hideViewportBox() {
+          const viewportBox = document.getElementById("viewportBox");
+          if (viewportBox) {
+            viewportBox.style.display = "none";
+          }
+          // 清除可能残留的红色十字元素
+          clearRedCrossLines();
+        }
+
+        // 清除红色十字元素
+        function clearRedCrossLines() {
+          // 清除旧的红线元素（如果存在）
+          const oldHLine = document.getElementById("centerHLine");
+          const oldVLine = document.getElementById("centerVLine");
+          if (oldHLine) oldHLine.remove();
+          if (oldVLine) oldVLine.remove();
+        }
+
+        // 更新视口中心红线（作为蓝框的子元素）
+        function updateViewportCenterLines(width, height) {
+          const viewportBox = document.getElementById("viewportBox");
+          if (!viewportBox) return;
+
+          let centerHLine = viewportBox.querySelector(".center-h-line");
+          let centerVLine = viewportBox.querySelector(".center-v-line");
+
+          // 如果不存在，创建红线元素作为蓝框的子元素
+          if (!centerHLine) {
+            centerHLine = document.createElement("div");
+            centerHLine.className = "center-h-line";
+            centerHLine.style.position = "absolute";
+            centerHLine.style.background = "red";
+            centerHLine.style.height = "1px";
+            centerHLine.style.width = "100%";
+            centerHLine.style.top = "50%";
+            centerHLine.style.left = "0";
+            centerHLine.style.transform = "translateY(-50%)";
+            centerHLine.style.pointerEvents = "none";
+            centerHLine.style.zIndex = "1";
+            viewportBox.appendChild(centerHLine);
+          }
+
+          if (!centerVLine) {
+            centerVLine = document.createElement("div");
+            centerVLine.className = "center-v-line";
+            centerVLine.style.position = "absolute";
+            centerVLine.style.background = "red";
+            centerVLine.style.width = "1px";
+            centerVLine.style.height = "100%";
+            centerVLine.style.left = "50%";
+            centerVLine.style.top = "0";
+            centerVLine.style.transform = "translateX(-50%)";
+            centerVLine.style.pointerEvents = "none";
+            centerVLine.style.zIndex = "1";
+            viewportBox.appendChild(centerVLine);
+          }
+        }
+
+        // 更新手机端PDF显示
+        function updatePDFDisplay() {
+          const wheelPdfImage = document.getElementById("wheelPdfImage");
+          if (!wheelPdfImage) return;
+
+          // 应用缩放和偏移
+          wheelPdfImage.style.transform = `scale(${state.mapScale}) translate(${state.offsetX}px, ${state.offsetY}px)`;
+        }
+
+        // 更新蓝框大小（根据缩放比例）
+        function updateViewportBoxSize() {
+          const viewportBox = document.getElementById("viewportBox");
+          if (!viewportBox) return;
+
+          // 获取滚轮容器尺寸作为基础大小
+          const leftWheel = document.getElementById("leftWheelContainer");
+          let baseWidth = window.innerWidth;
+          let baseHeight = window.innerHeight;
+          if (leftWheel) {
+            const wheelRect = leftWheel.getBoundingClientRect();
+            if (wheelRect.width > 0 && wheelRect.height > 0) {
+              baseWidth = wheelRect.width;
+              baseHeight = wheelRect.height;
+            }
+          }
+
+          // 缩放越大，蓝框越小（蓝框大小 = 基础大小 / 缩放比例）
+          const scaleFactor = 1 / state.mapScale;
+          const minScale = 0.2; // 最小蓝框为基础大小的20%
+          const maxScale = 1.0; // 最大蓝框为基础大小的100%
+          const clampedScale = Math.max(
+            minScale,
+            Math.min(maxScale, scaleFactor),
+          );
+
+          const boxWidth = baseWidth * clampedScale;
+          const boxHeight = baseHeight * clampedScale;
+
+          viewportBox.style.width = `${boxWidth}px`;
+          viewportBox.style.height = `${boxHeight}px`;
+
+          console.log(
+            "蓝框大小更新:",
+            boxWidth,
+            "x",
+            boxHeight,
+            "缩放比例:",
+            state.mapScale,
+          );
+        }
+
+        // 更新方框视口（蓝框大小等于滚轮容器，位置根据电脑端视口映射到滚轮容器）
+        function updateViewportBox(data) {
+          const viewportBox = document.getElementById("viewportBox");
+          if (!viewportBox) return;
+
+          // 获取滚轮容器（显示PDF的div）尺寸作为映射范围
+          const leftWheel = document.getElementById("leftWheelContainer");
+          if (!leftWheel) return;
+
+          const containerRect = leftWheel.getBoundingClientRect();
+          let containerWidth = containerRect.width;
+          let containerHeight = containerRect.height;
+
+          // 如果容器尺寸为0，使用屏幕尺寸作为后备
+          if (containerWidth <= 0 || containerHeight <= 0) {
+            containerWidth = window.innerWidth;
+            containerHeight = window.innerHeight;
+          }
+
+          // 蓝框基础大小等于滚轮容器大小
+          const boxWidth = containerWidth;
+          const boxHeight = containerHeight;
+
+          console.log(
+            "蓝框计算 - 滚轮容器尺寸:",
+            containerWidth,
+            "x",
+            containerHeight,
+          );
+
+          // 如果没有电脑端视口信息，蓝框居中显示
+          if (
+            !data ||
+            (!data.left && !data.top && !data.width && !data.height)
+          ) {
+            console.log("无电脑端视口信息，蓝框居中显示");
+            viewportBox.style.width = `${boxWidth}px`;
+            viewportBox.style.height = `${boxHeight}px`;
+            viewportBox.style.left = "50%";
+            viewportBox.style.top = "50%";
+            viewportBox.style.transform = "translate(-50%, -50%)";
+            return;
+          }
+
+          // 电脑端发送的字段名是 left, top, width, height
+          const { left, top, width, height, pageWidth, pageHeight } = data;
+          const viewportLeft = left || 0;
+          const viewportTop = top || 0;
+          const viewportWidth = width || pageWidth || 0;
+          const viewportHeight = height || pageHeight || 0;
+
+          // 缺少页面尺寸信息时，蓝框居中显示
+          if (!pageWidth || !pageHeight) {
+            console.warn("缺少页面尺寸信息，蓝框居中显示");
+            viewportBox.style.width = `${boxWidth}px`;
+            viewportBox.style.height = `${boxHeight}px`;
+            viewportBox.style.left = "50%";
+            viewportBox.style.top = "50%";
+            viewportBox.style.transform = "translate(-50%, -50%)";
+            return;
+          }
+
+          // 收到电脑端视口信息时，根据视口位置映射蓝框位置
+          console.log(
+            "收到电脑端视口信息",
+            "视口位置:",
+            viewportLeft,
+            viewportTop,
+            "视口尺寸:",
+            viewportWidth,
+            "x",
+            viewportHeight,
+            "页面尺寸:",
+            pageWidth,
+            "x",
+            pageHeight,
+          );
+
+          // 如果蓝框还没有设置大小，使用滚轮容器大小初始化
+          const currentWidth = parseFloat(viewportBox.style.width) || boxWidth;
+          const currentHeight =
+            parseFloat(viewportBox.style.height) || boxHeight;
+
+          // 计算电脑端视口中心在PDF页面上的位置
+          const viewportCenterX = viewportLeft + viewportWidth / 2;
+          const viewportCenterY = viewportTop + viewportHeight / 2;
+
+          // 计算视口中心在页面上的比例（0-1）
+          const ratioX = viewportCenterX / pageWidth;
+          const ratioY = viewportCenterY / pageHeight;
+
+          // 将比例映射到手机端容器上，计算蓝框中心位置
+          const boxCenterX = containerWidth * ratioX;
+          const boxCenterY = containerHeight * ratioY;
+
+          // 设置蓝框位置（左上角定位，减去蓝框一半大小使其居中于计算出的中心位置）
+          viewportBox.style.width = `${currentWidth}px`;
+          viewportBox.style.height = `${currentHeight}px`;
+          viewportBox.style.left = `${boxCenterX - currentWidth / 2}px`;
+          viewportBox.style.top = `${boxCenterY - currentHeight / 2}px`;
+          viewportBox.style.transform = "none";
+
+          console.log(
+            "蓝框位置映射 - 视口中心比例:",
+            ratioX.toFixed(2),
+            ratioY.toFixed(2),
+            "蓝框位置:",
+            boxCenterX - currentWidth / 2,
+            boxCenterY - currentHeight / 2,
+          );
+        }
+
+        // 图片缓存（横屏和竖屏）
+        const imageCache = {
+          landscape: null,
+          portrait: null,
+          lastInfo: null,
+        };
+
+        // 获取当前方向
+        function getCurrentOrientation() {
+          return window.innerWidth > window.innerHeight
+            ? "landscape"
+            : "portrait";
+        }
+
+        // 根据电脑端视口尺寸设置容器大小
+        function setContainerSize(viewportWidth, viewportHeight) {
+          const mapContainer = document.querySelector(".map-canvas-container");
+          const viewportBox = document.getElementById("viewportBox");
+          if (!mapContainer || !viewportBox) {
+            console.error("容器或视口框不存在");
+            return;
+          }
+
+          // 获取屏幕可用空间
+          const screenWidth = window.innerWidth;
+          const screenHeight = window.innerHeight;
+
+          // 计算视口比例
+          const viewportRatio = viewportWidth / viewportHeight;
+
+          console.log(
+            "设置容器大小 - 电脑视口:",
+            viewportWidth,
+            "x",
+            viewportHeight,
+            "比例:",
+            viewportRatio,
+          );
+
+          // 计算容器尺寸（保持视口比例，适应屏幕）
+          let containerWidth, containerHeight;
+          const screenRatio = screenWidth / screenHeight;
+
+          if (viewportRatio > screenRatio) {
+            // 视口更宽，按宽度适配
+            containerWidth = screenWidth * 0.9;
+            containerHeight = containerWidth / viewportRatio;
+          } else {
+            // 视口更高，按高度适配
+            containerHeight = screenHeight * 0.6;
+            containerWidth = containerHeight * viewportRatio;
+          }
+
+          console.log(
+            "设置容器大小 - 容器尺寸:",
+            containerWidth,
+            "x",
+            containerHeight,
+          );
+
+          // 设置容器大小
+          mapContainer.style.width = `${containerWidth}px`;
+          mapContainer.style.height = `${containerHeight}px`;
+          mapContainer.style.margin = "auto";
+
+          // 蓝框大小由 updateViewportBox 管理，此处不设置
+        }
+
+        // 发送屏幕尺寸信息（发送容器尺寸而非mapFrame尺寸）
+        function sendScreenInfo() {
+          const mapContainer = document.querySelector(".map-canvas-container");
+          if (!mapContainer) {
+            console.error("map-canvas-container元素不存在");
+            return;
+          }
+          const rect = mapContainer.getBoundingClientRect();
+          const orientation = getCurrentOrientation();
+
+          // 检查尺寸是否有效
+          if (rect.width <= 0 || rect.height <= 0) {
+            console.error("容器尺寸无效:", rect.width, "x", rect.height);
+            // 尝试获取body尺寸作为备选
+            const bodyRect = document.body.getBoundingClientRect();
+            console.log(
+              "尝试使用body尺寸:",
+              bodyRect.width,
+              "x",
+              bodyRect.height,
+            );
+            if (bodyRect.width > 0 && bodyRect.height > 0) {
+              sendCommand({
+                type: "screenInfo",
+                width: bodyRect.width,
+                height: bodyRect.height,
+                orientation: orientation,
+              });
+              return;
+            }
+            // 延迟重试
+            setTimeout(sendScreenInfo, 100);
+            return;
+          }
+
+          console.log(
+            "发送容器尺寸信息 - 尺寸:",
+            rect.width,
+            "x",
+            rect.height,
+            "方向:",
+            orientation,
+          );
+          sendCommand({
+            type: "screenInfo",
+            width: rect.width,
+            height: rect.height,
+            orientation: orientation,
+          });
+        }
+
+        // Supabase 配置
+        const SUPABASE_URL = "https://zwnluqynchoidpiittdp.supabase.co";
+        const SUPABASE_ANON_KEY =
+          "sb_publishable_bmgWwgQxTGMf0r8tyqyTHg__3g7osn1";
+        const supabaseClient = supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY,
+        );
+
+        // 登录状态
+        let isLoggedIn = false;
+        console.log("🔐 初始化登录状态:", isLoggedIn);
+
+        // 显示登录弹窗
+        function showLoginModal() {
+          const loginOverlay = document.getElementById("loginOverlay");
+          const loginForm = document.getElementById("loginForm");
+          if (loginOverlay) {
+            loginOverlay.classList.add("show");
+          }
+          // 添加点击外部关闭功能
+          loginOverlay.addEventListener("click", function closeLogin(e) {
+            if (e.target === loginOverlay) {
+              hideLoginModal();
+              loginOverlay.removeEventListener("click", closeLogin);
+            }
+          });
+        }
+
+        // 隐藏登录弹窗
+        function hideLoginModal() {
+          const loginOverlay = document.getElementById("loginOverlay");
+          if (loginOverlay) {
+            loginOverlay.classList.remove("show");
+          }
+        }
+
+        // 登录函数
+        async function login(email, password) {
+          console.log("🔐 尝试登录 - 当前状态:", isLoggedIn);
+
+          const loginError = document.getElementById("loginError");
+          const loginButton = document.getElementById("loginButton");
+          const originalButtonText = loginButton ? loginButton.textContent : "";
+
+          loginError.textContent = "";
+
+          // 修改按钮文本为"Please wait..."并添加动画
+          let waitingAnimation = null;
+          if (loginButton) {
+            loginButton.textContent = "Please wait.";
+            loginButton.disabled = true;
+
+            // 添加等待动画：. -> .. -> ... -> .... -> ..... -> ...... -> 循环
+            let dots = 1;
+            waitingAnimation = setInterval(() => {
+              dots = (dots % 6) + 1;
+              loginButton.textContent = "Please wait" + ".".repeat(dots);
+            }, 300);
+          }
+
+          try {
+            const { data, error } =
+              await supabaseClient.auth.signInWithPassword({
+                email,
+                password,
+              });
+
+            if (error) throw error;
+
+            isLoggedIn = true;
+            console.log("✅ 登录成功 - 更新状态:", isLoggedIn);
+            hideLoginModal();
+
+            // 发送登录成功消息到服务器，同步到主页
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(
+                JSON.stringify({
+                  type: "loginStatus",
+                  isLoggedIn: true,
+                }),
+              );
+              console.log("📤 发送登录状态消息到服务器");
+            }
+
+            return true;
+          } catch (err) {
+            console.error("❌ 登录失败:", err);
+            if (loginError) {
+              loginError.textContent = "登录失败：" + err.message;
+            }
+            return false;
+          } finally {
+            // 停止等待动画
+            if (waitingAnimation) {
+              clearInterval(waitingAnimation);
+            }
+            // 恢复按钮文本
+            if (loginButton) {
+              loginButton.textContent = originalButtonText;
+              loginButton.disabled = false;
+            }
+          }
+        }
+
+        // 监听屏幕方向变化
+        window.addEventListener("orientationchange", function () {
+          setTimeout(function () {
+            sendScreenInfo();
+          }, 300);
+        });
+
+        // 发送控制命令
+        function sendCommand(command) {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(command));
+            console.log("发送命令:", command);
+          } else {
+            console.error("WebSocket未连接");
+          }
+        }
+
+        // 页面加载时初始化WebSocket
+        document.addEventListener("DOMContentLoaded", function () {
+          // 显示测试图片
+          displayPDFImage("", { phoneWidth: 400, phoneHeight: 600 });
+          initWebSocket();
+
+          // 等待DOM完全渲染后再初始化蓝框
+          setTimeout(function () {
+            updateViewportBox();
+            showViewportBox();
+          }, 100);
+
+          // 触发工具栏弹出效果
+          setTimeout(function () {
+            const topToolbar = document.querySelector(".top-toolbar");
+            const bottomToolbar = document.querySelector(".bottom-toolbar");
+            if (topToolbar) topToolbar.classList.add("show");
+            if (bottomToolbar) bottomToolbar.classList.add("show");
+          }, 100);
+
+          // 触发刻度栏弹出效果
+          setTimeout(function () {
+            const leftWheelContainer =
+              document.getElementById("leftWheelContainer");
+            if (leftWheelContainer) leftWheelContainer.classList.add("show");
+          }, 200);
+
+          // 窗口resize时重新计算蓝框位置
+          window.addEventListener("resize", function () {
+            updateViewportBox();
+          });
+
+          // 绑定登录按钮事件
+          const loginButton = document.getElementById("loginButton");
+          const loginEmail = document.getElementById("loginEmail");
+          const loginPassword = document.getElementById("loginPassword");
+          if (loginButton) {
+            loginButton.addEventListener("click", () => {
+              const email = loginEmail.value.trim();
+              const password = loginPassword.value;
+              if (email && password) {
+                login(email, password);
+              } else {
+                const loginError = document.getElementById("loginError");
+                if (loginError) {
+                  loginError.textContent = "请输入账号和密码";
+                }
+              }
+            });
+
+            // 回车键登录
+            loginPassword.addEventListener("keypress", (e) => {
+              if (e.key === "Enter") {
+                const email = loginEmail.value.trim();
+                const password = loginPassword.value;
+                if (email && password) {
+                  login(email, password);
+                } else {
+                  const loginError = document.getElementById("loginError");
+                  if (loginError) {
+                    loginError.textContent = "请输入账号和密码";
+                  }
+                }
+              }
+            });
+          }
+        });
+
+        // 状态
+        const state = {
+          mapScale: 1.0,
+          leftSens: 1.0,
+          offsetX: 0,
+          offsetY: 0,
+          leftWheelPos: 0.125, // 1.0 / 8.0
+          bestView: { scale: 1.0, offsetX: 0, offsetY: 0 },
+          historyList: [],
+        };
+
+        // 滚轮相关变量
+        let activeWheel = null;
+        let wheelStartY = 0;
+        let wheelStartPos = 0;
+
+        // DOM
+        const leftContainer = document.getElementById("leftWheelContainer");
+        const settingsModal = document.getElementById("settingsModal");
+        const settingsBtn = document.getElementById("settingsBtn");
+        const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+        const fullscreenBtn = document.getElementById("fullscreenBtn");
+        const leftSensSlider = document.getElementById("leftSensSlider");
+        const leftSensInput = document.getElementById("leftSensInput");
+        const openFileBtn = document.getElementById("openFileBtn");
+        const fileInput = document.getElementById("fileInput");
+        const historyBtn = document.getElementById("historyBtn");
+        const historyDropdown = document.getElementById("historyDropdown");
+        const setBestBtn = document.getElementById("setBestBtn");
+        const toggleScaleBtn = document.getElementById("toggleScaleBtn");
+        const micBtn = document.getElementById("micBtn");
+        const voiceOverlay = document.getElementById("voiceOverlay");
+        const exitVoiceBtn = document.getElementById("exitVoiceBtn");
+        const voiceRecordBtn = document.getElementById("voiceRecordBtn");
+        const recordHint = document.getElementById("recordHint");
+
+        // PDF相关DOM
+        const mapFrame = document.getElementById("mapFrame");
+        const pdfViewer = document.getElementById("pdfViewer");
+        const mapCanvasContainer = document.querySelector(
+          ".map-canvas-container",
+        );
+
+        // 常量
+        const MIN_SCALE = 0.1;
+        const MAX_SCALE = 20.0;
+        const vibrateSupported = "vibrate" in navigator;
+
+        // 节流控制
+        let lastZoomTime = 0;
+        const zoomThrottleDelay = 100;
+
+        // ============ 交互控制模块 ============
+
+        // 缩放比例与位置转换函数
+        function scaleFromPos(pos) {
+          const scale = MIN_SCALE + pos * (MAX_SCALE - MIN_SCALE);
+          return Math.round(scale * 50) / 50; // 精度为1/50
+        }
+        function posFromScale(scale) {
+          return Math.min(
+            1,
+            Math.max(0, (scale - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)),
+          );
+        }
+
+        // 辅助函数（与电脑端loading风格一致）
+        function showLoading(show, message = "") {
+          let loadingModal = document.getElementById("loadingModal");
+          if (show) {
+            if (!loadingModal) {
+              loadingModal = document.createElement("div");
+              loadingModal.id = "loadingModal";
+              loadingModal.className = "loading-modal";
+              document.body.appendChild(loadingModal);
+            }
+            // 只显示省略号动画，不显示文字
+            loadingModal.innerHTML = `
+              <span class="loading-dots">
+                <span class="loading-dot"></span>
+                <span class="loading-dot"></span>
+                <span class="loading-dot"></span>
+              </span>
+            `;
+            loadingModal.style.display = "flex";
+          } else {
+            if (loadingModal) {
+              loadingModal.style.display = "none";
+            }
+          }
+        }
+
+        // 显示/隐藏PDF视图
+        function showPDFView() {
+          pdfViewer.classList.add("active");
+        }
+        function hidePDFView() {
+          pdfViewer.classList.remove("active");
+        }
+
+        // 加载PDF文件（发送命令到电脑端）
+        async function loadAndDisplayPDF(fileUrl) {
+          try {
+            console.log("加载PDF:", fileUrl);
+            showPDFView();
+          } catch (error) {
+            console.error("PDF加载失败:", error);
+          }
+        }
+
+        // ============ 拖拽控制 ============
+        const DragController = {
+          isDragging: false,
+          startX: 0,
+          startY: 0,
+          lastOffsetX: 0,
+          lastOffsetY: 0,
+          touchId: null,
+
+          start(e) {
+            const touch = e.touches[0];
+            if (e.touches.length !== 1) return;
+
+            this.isDragging = true;
+            this.touchId = touch.identifier;
+            this.startX = touch.clientX;
+            this.startY = touch.clientY;
+            this.lastOffsetX = state.offsetX;
+            this.lastOffsetY = state.offsetY;
+          },
+
+          move(e) {
+            if (!this.isDragging) return;
+
+            // 找到对应的触摸点
+            let touch = null;
+            for (let i = 0; i < e.touches.length; i++) {
+              if (e.touches[i].identifier === this.touchId) {
+                touch = e.touches[i];
+                break;
+              }
+            }
+            if (!touch) return;
+
+            // 计算偏移
+            const dx = touch.clientX - this.startX;
+            const dy = touch.clientY - this.startY;
+
+            // 更新状态
+            state.offsetX = this.lastOffsetX - dx / state.mapScale;
+            state.offsetY = this.lastOffsetY - dy / state.mapScale;
+
+            // 发送拖拽命令到电脑端（手机端PDF是静态的，不更新）
+            const panCommand = {
+              type: "pan",
+              offsetX: state.offsetX,
+              offsetY: state.offsetY,
+            };
+            console.log("📱 手机端发送pan命令:", panCommand);
+            sendCommand(panCommand);
+          },
+
+          end() {
+            this.isDragging = false;
+            this.touchId = null;
+          },
+        };
+
+        // ============ 缩放控制 ============
+        const ScaleController = {
+          initialDistance: 0,
+          initialScale: 1.0,
+          lastSendTime: 0,
+          sendInterval: 80, // 增加发送间隔，减少闪烁
+          pendingScale: null,
+          debounceTimer: null,
+          isSending: false,
+
+          start(e) {
+            if (e.touches.length !== 2) return;
+
+            // 取消拖拽状态
+            DragController.end();
+
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+
+            // 计算初始距离
+            this.initialDistance = Math.hypot(
+              t1.clientX - t2.clientX,
+              t1.clientY - t2.clientY,
+            );
+            this.initialScale = state.mapScale;
+            this.pendingScale = null;
+
+            // 清除之前的防抖定时器
+            if (this.debounceTimer) {
+              clearTimeout(this.debounceTimer);
+              this.debounceTimer = null;
+            }
+          },
+
+          move(e) {
+            if (e.touches.length !== 2) return;
+            if (this.initialDistance <= 0) return;
+
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+
+            // 计算当前距离
+            const currentDistance = Math.hypot(
+              t1.clientX - t2.clientX,
+              t1.clientY - t2.clientY,
+            );
+
+            // 计算新缩放比例
+            const scaleFactor = currentDistance / this.initialDistance;
+            const newScale = this.initialScale * scaleFactor;
+
+            // 应用缩放（带节流）
+            this.applyScale(newScale);
+          },
+
+          applyScale(newScale) {
+            // 限制缩放范围
+            newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+
+            // 忽略微小变化（增加阈值）
+            if (Math.abs(newScale - state.mapScale) < 0.005) return;
+
+            // 更新本地状态
+            state.mapScale = newScale;
+            this.pendingScale = newScale;
+
+            // 更新蓝框大小（缩放越大，蓝框越小）
+            updateViewportBoxSize();
+
+            // 节流控制：限制发送频率，实现丝滑缩放
+            const now = Date.now();
+            if (
+              now - this.lastSendTime >= this.sendInterval &&
+              !this.isSending
+            ) {
+              this.sendScale();
+            }
+          },
+
+          sendScale() {
+            if (this.pendingScale === null) return;
+
+            this.isSending = true;
+
+            // 发送缩放命令到电脑端（以电脑端中心进行放大）
+            sendCommand({ type: "zoom", scale: this.pendingScale });
+            sendCommand({ type: "refresh" });
+
+            this.lastSendTime = Date.now();
+            this.pendingScale = null;
+
+            // 标记发送完成
+            setTimeout(() => {
+              this.isSending = false;
+              // 如果发送期间有新的缩放请求，立即发送
+              if (this.pendingScale !== null) {
+                this.sendScale();
+              }
+            }, 100);
+          },
+
+          end() {
+            // 使用防抖确保最后一次缩放命令被发送
+            if (this.pendingScale !== null) {
+              const self = this;
+              this.debounceTimer = setTimeout(() => {
+                self.sendScale();
+              }, 50);
+            }
+
+            this.initialDistance = 0;
+            this.initialScale = 1.0;
+          },
+        };
+
+        // ============ 事件绑定 ============
+        // 使用 mapFrame 作为触摸事件容器，因为PDF图片显示在 leftWheelContainer 里
+        const touchContainer = mapFrame || mapCanvasContainer;
+        if (touchContainer) {
+          touchContainer.addEventListener(
+            "touchstart",
+            (e) => {
+              console.log("📱 触摸开始，触摸点数量:", e.touches.length);
+
+              // 移除双击检测（坐标系已通过按钮触发）
+
+              // 根据触摸点数量处理
+              if (e.touches.length === 1) {
+                DragController.start(e);
+                console.log("📱 开始拖拽");
+              } else if (e.touches.length === 2) {
+                ScaleController.start(e);
+                console.log("📱 开始缩放");
+              }
+            },
+            { passive: false },
+          );
+
+          touchContainer.addEventListener(
+            "touchmove",
+            (e) => {
+              if (e.touches.length === 1) {
+                DragController.move(e);
+              } else if (e.touches.length === 2) {
+                ScaleController.move(e);
+              }
+            },
+            { passive: false },
+          );
+
+          touchContainer.addEventListener("touchend", () => {
+            DragController.end();
+            ScaleController.end();
+          });
+
+          touchContainer.addEventListener("touchcancel", () => {
+            DragController.end();
+            ScaleController.end();
+          });
+        }
+
+        // 滚轮交互（仅左侧滚轮）
+        function wheelStart(e) {
+          e.preventDefault();
+          const touch = e.touches[0];
+          activeWheel = "left";
+          wheelStartY = touch.clientY;
+          wheelStartPos = state.leftWheelPos;
+        }
+        function wheelMove(e) {
+          e.preventDefault();
+          if (activeWheel !== "left") return;
+          const touch = e.touches[0];
+          const deltaY = wheelStartY - touch.clientY;
+          const h = leftContainer.clientHeight;
+          if (h <= 0) return;
+          const deltaPos = (deltaY / (h * 1.5)) * state.leftSens;
+          let newPos = Math.min(1, Math.max(0, wheelStartPos + deltaPos));
+          state.leftWheelPos = newPos;
+
+          const newScale = scaleFromPos(newPos);
+          if (Math.abs(newScale - state.mapScale) > 0.001) {
+            state.mapScale = newScale;
+
+            // 节流控制：限制发送缩放命令的频率
+            const now = Date.now();
+            if (now - lastZoomTime > zoomThrottleDelay) {
+              lastZoomTime = now;
+              // 发送缩放命令到主页面
+              sendCommand({ type: "zoom", scale: newScale });
+              // 发送 refresh 命令触发重新渲染
+              sendCommand({ type: "refresh" });
+            }
+          }
+          if (vibrateSupported && Math.abs(deltaY) > 2) navigator.vibrate(3);
+        }
+        function wheelEnd(e) {
+          e.preventDefault();
+          activeWheel = null;
+        }
+        // 已移除滚轮容器的触摸事件绑定（取消放大函数）
+        // 放大操作现在由地图容器的双指缩放控制
+
+        // 鼠标事件处理（电脑端，仅左侧滚轮）
+        function mouseWheelStart(e) {
+          e.preventDefault();
+          activeWheel = "left";
+          wheelStartY = e.clientY;
+          wheelStartPos = state.leftWheelPos;
+        }
+
+        function mouseWheelMove(e) {
+          e.preventDefault();
+          if (activeWheel !== "left") return;
+          const deltaY = wheelStartY - e.clientY;
+          const h = leftContainer.clientHeight;
+          if (h <= 0) return;
+          const deltaPos = (deltaY / (h * 1.5)) * state.leftSens;
+          let newPos = Math.min(1, Math.max(0, wheelStartPos + deltaPos));
+          state.leftWheelPos = newPos;
+
+          const newScale = scaleFromPos(newScale);
+          if (Math.abs(newScale - state.mapScale) > 0.001) {
+            state.mapScale = newScale;
+
+            // 节流控制：限制发送缩放命令的频率
+            const now = Date.now();
+            if (now - lastZoomTime > zoomThrottleDelay) {
+              lastZoomTime = now;
+              // 发送缩放命令到主页面
+              sendCommand({ type: "zoom", scale: newScale });
+              // 发送 refresh 命令触发重新渲染
+              sendCommand({ type: "refresh" });
+            }
+          }
+        }
+
+        function mouseWheelEnd(e) {
+          e.preventDefault();
+          activeWheel = null;
+        }
+
+        // 为滚轮容器添加鼠标事件监听器
+        leftContainer.addEventListener("mousedown", (e) =>
+          mouseWheelStart(e, "left"),
+        );
+        leftContainer.addEventListener("mousemove", (e) =>
+          mouseWheelMove(e, "left"),
+        );
+        leftContainer.addEventListener("mouseup", mouseWheelEnd);
+        leftContainer.addEventListener("mouseleave", mouseWheelEnd);
+
+        // 底部按钮功能
+        openFileBtn.addEventListener("click", () => {
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          // 触发手机端文件选择器
+          fileInput.click();
+        });
+
+        // 坐标系按钮功能 - 点击呼出电脑端坐标系
+        const coordinateBtn = document.getElementById("coordinateBtn");
+        coordinateBtn.addEventListener("click", () => {
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          // 发送切换坐标系命令到电脑端
+          sendCommand({ type: "toggleGrid" });
+        });
+
+        // 文件选择事件处理 - 上传到Supabase并通知电脑端
+        fileInput.addEventListener("change", async (e) => {
+          const file = fileInput.files[0];
+          if (!file) return;
+
+          // 验证文件类型
+          if (file.type !== "application/pdf" && !file.name.endsWith(".pdf")) {
+            console.warn("📱 请选择PDF文件:", file.name);
+            return;
+          }
+
+          // 验证文件大小（限制为1MB，与电脑端一致）
+          if (file.size > 1 * 1024 * 1024) {
+            console.warn("📱 文件超过1MB，跳过上传:", file.size);
+            return;
+          }
+
+          try {
+            console.log("📱 开始上传文件:", file.name, "大小:", file.size);
+
+            // 生成唯一文件名（与电脑端格式一致）
+            const ext = file.name.split(".").pop();
+            const storageName = `${Date.now()}_${Math.random().toString(36).substr(2)}.${ext}`;
+
+            // 上传到 Supabase（使用与电脑端相同的存储桶 "PDFs"）
+            const { error: uploadErr } = await supabaseClient.storage
+              .from("PDFs")
+              .upload(storageName, file);
+
+            if (uploadErr) {
+              console.error("📱 上传失败:", uploadErr);
+              return;
+            }
+
+            console.log("📱 上传成功，存储路径:", storageName);
+
+            // 发送文件信息到电脑端（发送存储路径，与历史文件格式一致）
+            sendCommand({
+              type: "openFileFromSupabase",
+              fileName: file.name,
+              storagePath: storageName,
+            });
+
+            console.log("📱 已发送文件信息到电脑端");
+          } catch (uploadError) {
+            console.error("📱 上传异常:", uploadError);
+          }
+        });
+
+        // 从API获取历史文件列表
+        async function fetchHistoryList() {
+          try {
+            const response = await fetch("/api/history");
+            const data = await response.json();
+            state.historyList = data;
+            console.log("获取历史文件:", data);
+            return data;
+          } catch (error) {
+            console.error("获取历史失败:", error);
+            return [];
+          }
+        }
+
+        // 显示历史文件选择弹窗
+        function showHistoryModal() {
+          // 创建弹窗
+          const modal = document.createElement("div");
+          modal.className = "history-modal";
+          modal.innerHTML = `
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+              <div class="modal-header">
+                <span class="modal-title">历史文件</span>
+                <button class="modal-close">×</button>
+              </div>
+              <div class="modal-body" id="historyListContainer"></div>
+            </div>
+          `;
+          document.body.appendChild(modal);
+
+          // 绑定关闭事件
+          const overlay = modal.querySelector(".modal-overlay");
+          const closeBtn = modal.querySelector(".modal-close");
+          overlay.addEventListener("click", () => modal.remove());
+          closeBtn.addEventListener("click", () => modal.remove());
+
+          // 加载并显示历史文件
+          fetchHistoryList().then((history) => {
+            const container = document.getElementById("historyListContainer");
+            if (history.length === 0) {
+              container.innerHTML =
+                "<div class='empty-history'>暂无历史文件</div>";
+            } else {
+              // 使用事件委托绑定点击事件
+              history.forEach((item) => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "history-item";
+                itemDiv.textContent = item.file_name;
+                itemDiv.addEventListener("click", () => {
+                  // 发送加载文件命令到所有屏幕，包含屏幕列表
+                  sendCommand({
+                    type: "loadHistoryFile",
+                    storagePath: item.storage_path,
+                    fileName: item.file_name,
+                    screens: Object.values(screenManager.screens).map((s) => ({
+                      windowId: s.id,
+                      isMain: s.isMain,
+                    })),
+                  });
+                  // 关闭弹窗
+                  modal.remove();
+                });
+                container.appendChild(itemDiv);
+              });
+            }
+          });
+        }
+
+        historyBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          // 在手机端显示历史文件选择弹窗
+          showHistoryModal();
+        });
+
+        // 最佳比例按钮逻辑
+        let bestScaleLongPressTimer = null;
+        let bestScaleLongPressed = false; // 标记是否触发了长按
+        const BEST_SCALE_LONG_PRESS_DURATION = 500;
+
+        // 双击检测变量（触摸设备）
+        let touchStartTime = 0;
+        let touchCount = 0;
+        const DOUBLE_TAP_THRESHOLD = 300; // 双击时间阈值
+
+        // 单击：不发送命令（电脑端单击也没有改变比例的事件）
+        setBestBtn.addEventListener("click", () => {
+          // 如果已经触发了长按，忽略单击事件
+          if (bestScaleLongPressed) {
+            bestScaleLongPressed = false;
+            return;
+          }
+          // 单击不发送任何命令（电脑端单击无实际操作）
+        });
+
+        // 双击保存最佳比例（桌面端）
+        setBestBtn.addEventListener("dblclick", () => {
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          // 发送保存最佳比例命令到主页面
+          sendCommand({ type: "saveBestScale" });
+        });
+
+        // 长按重置最佳比例（桌面设备）
+        setBestBtn.addEventListener("mousedown", () => {
+          // 清除之前的定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+          }
+          bestScaleLongPressed = false;
+          // 设置新的定时器
+          bestScaleLongPressTimer = setTimeout(() => {
+            bestScaleLongPressed = true; // 标记已触发长按
+            // 发送重置最佳比例命令到主页面
+            sendCommand({ type: "resetBestScale" });
+          }, BEST_SCALE_LONG_PRESS_DURATION);
+        });
+
+        setBestBtn.addEventListener("mouseup", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        setBestBtn.addEventListener("mouseleave", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        // 触摸设备：同时处理双击和长按
+        setBestBtn.addEventListener("touchstart", () => {
+          const now = Date.now();
+
+          // 双击检测
+          if (now - touchStartTime < DOUBLE_TAP_THRESHOLD) {
+            touchCount++;
+            if (touchCount >= 2) {
+              // 发送保存最佳比例命令到主页面
+              sendCommand({ type: "saveBestScale" });
+              touchCount = 0;
+              // 清除长按定时器
+              if (bestScaleLongPressTimer) {
+                clearTimeout(bestScaleLongPressTimer);
+                bestScaleLongPressTimer = null;
+              }
+              return; // 双击时不启动长按定时器
+            }
+          } else {
+            touchCount = 1;
+          }
+          touchStartTime = now;
+
+          // 长按检测
+          // 清除之前的定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+          }
+          bestScaleLongPressed = false;
+          // 设置新的定时器
+          bestScaleLongPressTimer = setTimeout(() => {
+            bestScaleLongPressed = true; // 标记已触发长按
+            touchCount = 0; // 重置双击计数
+            // 发送重置最佳比例命令到主页面
+            sendCommand({ type: "resetBestScale" });
+          }, BEST_SCALE_LONG_PRESS_DURATION);
+        });
+
+        setBestBtn.addEventListener("touchend", () => {
+          // 清除定时器
+          if (bestScaleLongPressTimer) {
+            clearTimeout(bestScaleLongPressTimer);
+            bestScaleLongPressTimer = null;
+          }
+        });
+
+        toggleScaleBtn.addEventListener("click", () => {
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          // 发送切换视图命令到主页面
+          sendCommand({ type: "toggleView" });
+        });
+
+        // 手柄按钮（屏幕管理功能）
+        const controllerBtn = document.getElementById("controllerBtn");
+        const screenModal = document.getElementById("screenModal");
+        const scanBtn = document.getElementById("scanBtn");
+
+        controllerBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          console.log("🎮 controllerBtn点击 - 登录状态检查:", isLoggedIn);
+          if (!isLoggedIn) {
+            console.log("🔒 未登录，显示登录框");
+            showLoginModal();
+            return;
+          }
+          console.log("🔓 已登录，显示屏幕管理");
+          // 显示屏幕管理模态框
+          screenModal.classList.add("show");
+          // 更新屏幕列表
+          updateScreenList();
+        });
+
+        // 点击模态框遮罩关闭
+        screenModal.addEventListener("click", (e) => {
+          if (e.target === screenModal) {
+            screenModal.classList.remove("show");
+          }
+        });
+
+        // 扫描按钮功能
+        scanBtn.addEventListener("click", async () => {
+          // 创建权限请求提示框
+          const permissionOverlay = document.createElement("div");
+          permissionOverlay.id = "permissionOverlay";
+          document.body.appendChild(permissionOverlay);
+
+          // 检查浏览器环境
+          const checkEnvironment = () => {
+            // 检查是否为安全上下文（HTTPS或localhost）
+            if (!navigator.mediaDevices || !window.isSecureContext) {
+              permissionOverlay.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center;">
+                  <div style="background: #333; border-radius: 18px; padding: 24px; min-width: 280px; max-width: 90%; text-align: center;">
+                    <div style="font-size: 18px; font-weight: 600; color: #ff6b6b; margin-bottom: 12px;">无法使用摄像头</div>
+                    <div style="font-size: 14px; color: #aaa; margin-bottom: 8px;">当前环境不支持摄像头访问</div>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 20px;">请使用HTTPS协议或localhost访问</div>
+                    <button id="closeCamera" style="width: 100%; padding: 12px; background: #5078aa; color: white; border: none; border-radius: 12px; font-size: 16px;">关闭</button>
+                  </div>
+                </div>
+              `;
+              document
+                .getElementById("closeCamera")
+                .addEventListener("click", () => {
+                  permissionOverlay.remove();
+                });
+              return false;
+            }
+            return true;
+          };
+
+          // 检查权限状态
+          const checkPermission = async () => {
+            try {
+              const result = await navigator.permissions.query({
+                name: "camera",
+              });
+              return result.state; // 'granted', 'denied', 'prompt'
+            } catch (err) {
+              console.log("权限API不可用");
+              return "unknown";
+            }
+          };
+
+          // 显示权限请求弹窗
+          const showPermissionRequest = () => {
+            permissionOverlay.innerHTML = `
+              <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center;">
+                <div style="background: #333; border-radius: 18px; padding: 24px; min-width: 280px; max-width: 90%; text-align: center;">
+                  <div style="font-size: 18px; font-weight: 600; color: white; margin-bottom: 12px;">需要摄像头权限</div>
+                  <div style="font-size: 14px; color: #aaa; margin-bottom: 20px;">请允许访问摄像头以扫描二维码</div>
+                  <div style="display: flex; gap: 12px;">
+                    <button id="allowCamera" style="flex: 1; padding: 12px; background: #5078aa; color: white; border: none; border-radius: 12px; font-size: 16px;">允许</button>
+                    <button id="denyCamera" style="flex: 1; padding: 12px; background: #555; color: white; border: none; border-radius: 12px; font-size: 16px;">取消</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          };
+
+          // 显示权限被拒绝的提示
+          const showPermissionDenied = () => {
+            permissionOverlay.innerHTML = `
+              <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center;">
+                <div style="background: #333; border-radius: 18px; padding: 24px; min-width: 280px; max-width: 90%; text-align: center;">
+                  <div style="font-size: 18px; font-weight: 600; color: #ff6b6b; margin-bottom: 12px;">权限被拒绝</div>
+                  <div style="font-size: 14px; color: #aaa; margin-bottom: 8px;">摄像头权限已被拒绝</div>
+                  <div style="font-size: 12px; color: #666; margin-bottom: 20px;">请在浏览器设置中重新开启权限</div>
+                  <div style="display: flex; gap: 12px;">
+                    <button id="retryCamera" style="flex: 1; padding: 12px; background: #5078aa; color: white; border: none; border-radius: 12px; font-size: 16px;">重试</button>
+                    <button id="closeCamera" style="flex: 1; padding: 12px; background: #555; color: white; border: none; border-radius: 12px; font-size: 16px;">关闭</button>
+                  </div>
+                </div>
+              </div>
+            `;
+            document
+              .getElementById("retryCamera")
+              .addEventListener("click", startScan);
+            document
+              .getElementById("closeCamera")
+              .addEventListener("click", () => {
+                permissionOverlay.remove();
+              });
+          };
+
+          // 开始扫描
+          const startScan = async () => {
+            // 检查环境
+            if (!checkEnvironment()) return;
+
+            // 检查权限状态
+            const permissionState = await checkPermission();
+
+            if (permissionState === "denied") {
+              showPermissionDenied();
+              return;
+            }
+
+            if (permissionState === "prompt" || permissionState === "unknown") {
+              showPermissionRequest();
+              document
+                .getElementById("allowCamera")
+                .addEventListener("click", () => {
+                  executeScan();
+                });
+              document
+                .getElementById("denyCamera")
+                .addEventListener("click", () => {
+                  permissionOverlay.remove();
+                });
+              return;
+            }
+
+            // 权限已授予，直接开始扫描
+            if (permissionState === "granted") {
+              executeScan();
+            }
+          };
+
+          // 执行扫描
+          const executeScan = async () => {
+            try {
+              // 请求摄像头权限
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" },
+              });
+
+              // 移除权限提示框
+              permissionOverlay.remove();
+
+              // 创建扫描界面
+              const scanOverlay = document.createElement("div");
+              scanOverlay.id = "scanOverlay";
+              scanOverlay.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                  <video id="scanVideo" style="width: 100%; max-width: 400px; height: auto;"></video>
+                  <div style="color: white; margin-top: 20px; font-size: 16px;">扫描二维码连接屏幕</div>
+                  <button id="scanCancel" style="margin-top: 20px; padding: 12px 32px; background: #5078aa; color: white; border: none; border-radius: 20px; font-size: 16px;">取消</button>
+                </div>
+              `;
+              document.body.appendChild(scanOverlay);
+
+              const video = document.getElementById("scanVideo");
+              const cancelBtn = document.getElementById("scanCancel");
+              video.srcObject = stream;
+              video.play();
+
+              // 使用ZXing库扫描二维码（如果可用）
+              if (window.ZXing) {
+                const codeReader = new ZXing.BrowserMultiFormatReader();
+                codeReader.decodeFromVideoElement(video, (result, err) => {
+                  if (result) {
+                    const url = result.text;
+                    if (url.includes("/controller?")) {
+                      // 停止摄像头
+                      stream.getTracks().forEach((track) => track.stop());
+                      // 移除扫描界面
+                      scanOverlay.remove();
+
+                      // 添加屏幕到列表（不跳转）
+                      if (addScreenFromUrl(url)) {
+                        // 震动反馈
+                        if (vibrateSupported) {
+                          navigator.vibrate([50, 30, 50]);
+                        }
+                      }
+                    } else {
+                      // 扫描到无效URL
+                      alert("扫描到无效的手柄二维码");
+                      stream.getTracks().forEach((track) => track.stop());
+                      scanOverlay.remove();
+                    }
+                  }
+                });
+              } else {
+                alert("请使用手机相机扫描二维码，然后手动输入URL");
+                stream.getTracks().forEach((track) => track.stop());
+                scanOverlay.remove();
+              }
+
+              cancelBtn.addEventListener("click", () => {
+                stream.getTracks().forEach((track) => track.stop());
+                scanOverlay.remove();
+              });
+            } catch (err) {
+              console.error("摄像头访问失败:", err);
+              showPermissionDenied();
+            }
+          };
+
+          // 启动扫描流程
+          startScan();
+        });
+
+        // URL输入框功能（用于测试）
+        const screenUrlInput = document.getElementById("screenUrlInput");
+        const urlSubmitBtn = document.getElementById("urlSubmitBtn");
+
+        // 次屏幕控制按钮
+        const exitControlBtn = document.getElementById("exitControlBtn");
+        const ctrlRatioBtn = document.getElementById("ctrlRatioBtn");
+        const ctrlPanBtn = document.getElementById("ctrlPanBtn");
+        const ctrlBgToggleBtn = document.getElementById("ctrlBgToggleBtn");
+        const ctrlFullscreenBtn = document.getElementById("ctrlFullscreenBtn");
+
+        // 退出控制按钮事件
+        exitControlBtn.addEventListener("click", () => {
+          exitSecondaryScreenControl();
+        });
+
+        // 控制按钮事件 - 比例设置
+        ctrlRatioBtn.addEventListener("click", () => {
+          if (currentControlScreenId) {
+            // 发送命令到次屏（次屏端已处理为不弹窗）
+            sendCommand({
+              type: "showRatioModal",
+              targetWindowId: currentControlScreenId,
+            });
+
+            // 显示本地比例设置区域
+            const ratioSection = document.getElementById("ratioControlSection");
+            if (ratioSection) {
+              ratioSection.classList.add("show");
+            }
+
+            // 禁用所有控制按钮和退出按钮（变为灰色不可编辑）
+            ctrlRatioBtn.classList.add("disabled");
+            ctrlPanBtn.classList.add("disabled");
+            ctrlBgToggleBtn.classList.add("disabled");
+            ctrlFullscreenBtn.classList.add("disabled");
+            exitControlBtn.classList.add("disabled");
+          }
+        });
+
+        // 比例滑块值更新
+        const ctrlXSlider = document.getElementById("ctrlXSlider");
+        const ctrlYSlider = document.getElementById("ctrlYSlider");
+        const ctrlXValue = document.getElementById("ctrlXValue");
+        const ctrlYValue = document.getElementById("ctrlYValue");
+
+        ctrlXSlider.addEventListener("input", () => {
+          ctrlXValue.textContent = ctrlXSlider.value + "%";
+        });
+
+        ctrlYSlider.addEventListener("input", () => {
+          ctrlYValue.textContent = ctrlYSlider.value + "%";
+        });
+
+        // 保存原始比例值
+        let originalXValue = 100;
+        let originalYValue = 100;
+
+        // 取消按钮
+        const ctrlRatioCancelBtn =
+          document.getElementById("ctrlRatioCancelBtn");
+        ctrlRatioCancelBtn.addEventListener("click", () => {
+          // 恢复原始值
+          ctrlXSlider.value = originalXValue;
+          ctrlYSlider.value = originalYValue;
+          ctrlXValue.textContent = originalXValue + "%";
+          ctrlYValue.textContent = originalYValue + "%";
+
+          // 隐藏比例设置区域
+          const ratioSection = document.getElementById("ratioControlSection");
+          if (ratioSection) {
+            ratioSection.classList.remove("show");
+          }
+
+          // 启用所有控制按钮和退出按钮
+          ctrlRatioBtn.classList.remove("disabled");
+          ctrlPanBtn.classList.remove("disabled");
+          ctrlBgToggleBtn.classList.remove("disabled");
+          ctrlFullscreenBtn.classList.remove("disabled");
+          exitControlBtn.classList.remove("disabled");
+        });
+
+        // 九宫格锚点按钮排他选择
+        const anchorGrid = document.getElementById("ctrlAnchorGrid");
+        if (anchorGrid) {
+          anchorGrid.addEventListener("click", (e) => {
+            const target = e.target.closest(".anchor-btn");
+            if (target) {
+              // 移除所有按钮的active状态
+              anchorGrid.querySelectorAll(".anchor-btn").forEach((btn) => {
+                btn.classList.remove("active");
+              });
+              // 添加当前按钮的active状态
+              target.classList.add("active");
+            }
+          });
+        }
+
+        // 获取当前选中的锚点值
+        function getSelectedAnchor() {
+          const activeBtn = document.querySelector(".anchor-btn.active");
+          return activeBtn ? activeBtn.dataset.anchor : "top-left";
+        }
+
+        // 确认按钮
+        const ctrlRatioConfirmBtn = document.getElementById(
+          "ctrlRatioConfirmBtn",
+        );
+        ctrlRatioConfirmBtn.addEventListener("click", () => {
+          if (currentControlScreenId) {
+            // 发送比例设置命令到次屏幕
+            sendCommand({
+              type: "setRatio",
+              targetWindowId: currentControlScreenId,
+              x: parseInt(ctrlXSlider.value),
+              y: parseInt(ctrlYSlider.value),
+              anchor: getSelectedAnchor(),
+            });
+
+            // 保存当前值作为新的原始值
+            originalXValue = parseInt(ctrlXSlider.value);
+            originalYValue = parseInt(ctrlYSlider.value);
+          }
+
+          // 隐藏比例设置区域
+          const ratioSection = document.getElementById("ratioControlSection");
+          if (ratioSection) {
+            ratioSection.classList.remove("show");
+          }
+
+          // 启用所有控制按钮和退出按钮
+          ctrlRatioBtn.classList.remove("disabled");
+          ctrlPanBtn.classList.remove("disabled");
+          ctrlBgToggleBtn.classList.remove("disabled");
+          ctrlFullscreenBtn.classList.remove("disabled");
+          exitControlBtn.classList.remove("disabled");
+        });
+
+        // 控制按钮事件 - 平移
+        ctrlPanBtn.addEventListener("click", () => {
+          if (currentControlScreenId) {
+            sendCommand({
+              type: "pan",
+              targetWindowId: currentControlScreenId,
+            });
+          }
+        });
+
+        // 控制按钮事件 - 切换背景
+        ctrlBgToggleBtn.addEventListener("click", () => {
+          if (currentControlScreenId) {
+            sendCommand({
+              type: "toggleBackground",
+              targetWindowId: currentControlScreenId,
+            });
+          }
+        });
+
+        // 控制按钮事件 - 全屏
+        ctrlFullscreenBtn.addEventListener("click", () => {
+          if (currentControlScreenId) {
+            sendCommand({
+              type: "fullscreen",
+              targetWindowId: currentControlScreenId,
+            });
+          }
+        });
+
+        // 解析URL获取参数
+        function parseControllerUrl(url) {
+          try {
+            const urlObj = new URL(url);
+            return {
+              session: urlObj.searchParams.get("session"),
+              windowId: urlObj.searchParams.get("window"),
+              date: urlObj.searchParams.get("date"),
+            };
+          } catch (err) {
+            return null;
+          }
+        }
+
+        // 添加新屏幕到列表
+        function addScreenFromUrl(url) {
+          const params = parseControllerUrl(url);
+          if (!params || !params.windowId || !params.session) {
+            alert("无效的手柄URL");
+            return false;
+          }
+
+          // 检查是否已存在
+          if (screenManager.screens[params.windowId]) {
+            // 向已连接的屏幕发送提醒消息
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(
+                JSON.stringify({
+                  type: "duplicateScreen",
+                  windowId: params.windowId,
+                  message: "该屏幕已在手机端连接",
+                }),
+              );
+            }
+            return false;
+          }
+
+          // 检查是否超过最大屏幕数
+          const screenCount = Object.keys(screenManager.screens).length;
+          if (screenCount >= screenManager.maxScreens) {
+            alert("已达最大屏幕数（5个）");
+            return false;
+          }
+
+          // 添加到屏幕管理器
+          const isMain = screenCount === 0;
+          screenManager.screens[params.windowId] = {
+            id: params.windowId,
+            name: isMain ? "主屏" : `次屏${screenCount}`,
+            isMain: isMain,
+            connectedAt: Date.now(),
+            sessionId: params.session,
+          };
+
+          if (isMain) {
+            screenManager.mainScreen = params.windowId;
+          }
+
+          // 如果当前没有控制的屏幕，设为当前屏幕
+          if (!screenManager.currentScreen) {
+            screenManager.currentScreen = params.windowId;
+          }
+
+          // 更新UI
+          updateScreenList();
+          return true;
+        }
+
+        urlSubmitBtn.addEventListener("click", () => {
+          const url = screenUrlInput.value.trim();
+          if (!url) {
+            return;
+          }
+          if (!url.includes("/controller?")) {
+            return;
+          }
+
+          // 添加屏幕到列表（不跳转）
+          if (addScreenFromUrl(url)) {
+            // 清空输入框
+            screenUrlInput.value = "";
+            // 震动反馈
+            if (vibrateSupported) {
+              navigator.vibrate(50);
+            }
+          }
+        });
+
+        // 回车键提交
+        screenUrlInput.addEventListener("keyup", (e) => {
+          if (e.key === "Enter") {
+            urlSubmitBtn.click();
+          }
+        });
+
+        // 自动粘贴检测
+        screenUrlInput.addEventListener("paste", (e) => {
+          setTimeout(() => {
+            const url = screenUrlInput.value.trim();
+            if (url.includes("/controller?")) {
+              urlSubmitBtn.click();
+            }
+          }, 100);
+        });
+
+        // 全屏按钮功能
+        fullscreenBtn.addEventListener("click", () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+              console.error(`全屏错误: ${err.message}`);
+            });
+          } else {
+            if (document.exitFullscreen) {
+              document.exitFullscreen();
+            }
+          }
+
+          // 发送全屏命令到主页面
+          sendCommand({
+            type: "fullscreen",
+            state: !document.fullscreenElement,
+          });
+        });
+
+        let pressTimer,
+          recording = false;
+        micBtn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          pressTimer = setTimeout(() => {
+            recording = true;
+            // 添加语音活动样式 - 同时影响顶部和底部工具栏
+            document
+              .querySelector(".top-toolbar")
+              .classList.add("voice-active");
+            document
+              .querySelector(".bottom-toolbar")
+              .classList.add("voice-active");
+            // 发送开始录音命令到主页面
+            sendCommand({ type: "voice", action: "start" });
+          }, 300);
+        });
+        micBtn.addEventListener("touchend", () => {
+          clearTimeout(pressTimer);
+          if (recording) {
+            recording = false;
+            // 移除语音活动样式 - 同时移除顶部和底部工具栏
+            document
+              .querySelector(".top-toolbar")
+              .classList.remove("voice-active");
+            document
+              .querySelector(".bottom-toolbar")
+              .classList.remove("voice-active");
+            // 发送结束录音命令到主页面
+            sendCommand({ type: "voice", action: "end" });
+          }
+        });
+
+        // 设置面板
+        function syncSettings() {
+          leftSensSlider.value = state.leftSens;
+          leftSensInput.value = state.leftSens;
+        }
+        leftSensSlider.addEventListener("input", () => {
+          state.leftSens = parseFloat(leftSensSlider.value);
+          leftSensInput.value = state.leftSens;
+        });
+        leftSensInput.addEventListener("change", () => {
+          let v = parseFloat(leftSensInput.value) || 1;
+          v = Math.min(3.0, Math.max(0.5, v));
+          state.leftSens = v;
+          leftSensSlider.value = v;
+        });
+        // 设置按钮点击事件，仅当滚轮存在时显示设置面板
+        settingsBtn.addEventListener("click", () => {
+          if (!isLoggedIn) {
+            showLoginModal();
+            return;
+          }
+          const leftWheel = document.getElementById("leftWheelContainer");
+
+          if (leftWheel.classList.contains("show")) {
+            syncSettings();
+            settingsModal.classList.add("show");
+          }
+        });
+        closeSettingsBtn.addEventListener("click", () => {
+          settingsModal.classList.remove("show");
+        });
+        settingsModal.addEventListener("click", (e) => e.stopPropagation());
+        document.addEventListener("click", (e) => {
+          // 点击外部关闭设置面板
+          if (!settingsModal.contains(e.target) && e.target !== settingsBtn)
+            settingsModal.classList.remove("show");
+        });
+
+        fullscreenBtn.addEventListener("click", () => {
+          if (!document.fullscreenElement)
+            document.documentElement.requestFullscreen();
+          else document.exitFullscreen();
+        });
+
+        document.body.addEventListener(
+          "touchmove",
+          (e) => {
+            if (
+              e.target.closest(
+                ".wheel-inline, .map-canvas-container, .tool-btn",
+              )
+            )
+              e.preventDefault();
+          },
+          { passive: false },
+        );
+
+        // 初始化状态
+        state.leftWheelPos = posFromScale(1.0);
+      })();
+    </script>
+
+    <!-- 登录弹窗 -->
+    <div class="login-overlay" id="loginOverlay">
+      <div class="login-form" id="loginForm">
+        <div class="login-title">EasyPDF</div>
+        <input
+          type="email"
+          id="loginEmail"
+          placeholder="邮箱"
+          class="login-input"
+        />
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="密码"
+          class="login-input"
+        />
+        <button id="loginButton" class="login-button">Login</button>
+        <div class="login-error" id="loginError"></div>
+      </div>
+    </div>
+  </body>
+</html>

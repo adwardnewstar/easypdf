@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
+    "tencentcloud-sdk-nodejs": "^4.1.227",
+    "ws": "^8.20.0"
+  }
+}
